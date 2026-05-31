@@ -6,29 +6,28 @@ This project is a semantic document retrieval system that indexes markdown files
 
 ### 1. Vector Engine (`src/engine.ts`)
 The heart of the system. It handles:
+- **Dual Database Support**: Automatically switches between local **PGlite** (with disk persistence in `./.db`) and external **Postgres** (via `POSTGRES_URL`).
+- **Smart Chunking**: Splits documents by headers and then into overlapping chunks (~600 chars) to preserve context. Each chunk is indexed with its hierarchical context (H1 > Heading).
 - **Embedding Generation**: Uses `@xenova/transformers` with the `all-MiniLM-L6-v2` model to generate 384-dimensional vectors locally.
-- **Storage**: Uses `PGlite`, a WASM-powered Postgres build, with the `vector` extension.
-- **Indexing**: Recursively scans the `docs/` directory, splits markdown files into sections based on headers, and stores them with their embeddings.
-- **Search**: Performs cosine similarity search using the `<=>` operator.
+- **Hybrid Search**: Combines semantic similarity (pgvector) with keyword ranking (tsvector) for precise results.
 
 ### 2. MCP Server (`src/mcp.ts`)
 The primary interface for AI models.
 - Implements the [Model Context Protocol](https://modelcontextprotocol.io/).
-- Exposes a tool called `semantic_markdown_search`.
-- Communicates over standard input/output (stdio).
+- **Tools**:
+    - `semantic_markdown_search`: Returns granular document chunks using hybrid ranking.
+    - `get_full_document`: Retrieves raw raw markdown content for full context.
+
 
 ### 3. HTTP API Server (`src/api.ts`)
 An optional interface for traditional web clients.
-- Started by passing the `--api` flag.
-- Exposes a `/search` POST endpoint on port 4321.
-
-### 4. Logger (`src/logger.ts`)
-- Uses `pino` for high-performance logging.
-- Logs are persisted to `.logs/app.log`.
+- **Endpoints**:
+    - `POST /search`: Conceptual search returning granular chunks.
+    - `GET /read?path=...`: Full document retrieval.
 
 ## System Workflow
 
-1. **Initialization**: On startup, the `VectorEngine` is initialized, and the `PGlite` database is prepared.
-2. **Indexing**: The engine scans the `docs/` folder and populates the vector database.
-3. **Serving**: Depending on the start flags, either the MCP server or the HTTP API server starts listening for requests.
-4. **Querying**: When a query is received, it is converted into an embedding, and a similarity search is performed against the indexed chunks.
+1. **Initialization**: On startup, the `VectorEngine` detects its environment (Docker, External URL, or Local) and initializes the appropriate database connection.
+2. **Persistence Check**: The engine checks if data already exists. If the database is populated, it skips the expensive re-indexing phase.
+3. **Indexing (Optional)**: If empty, the engine recursively scans the `docs/` folder, chunks the files into paragraphs, and populates the database.
+4. **Querying**: When a query is received, it is converted into an embedding, and a similarity search is performed. The user can then fetch the full file path returned by the search for deeper context.

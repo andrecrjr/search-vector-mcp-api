@@ -3,68 +3,105 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>raglike-md</title>
+    <title>raglike-md | Semantic Docs Search</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); }
         [v-cloak] { display: none; }
     </style>
 </head>
-<body class="bg-[#f8fafc] min-h-screen text-slate-900 font-sans selection:bg-blue-100 selection:text-blue-900">
-    <div class="max-w-4xl mx-auto px-4 py-16">
-        <header class="text-center mb-16 space-y-4">
-            <div class="inline-block px-4 py-1.5 mb-2 rounded-full bg-blue-50 text-blue-600 text-sm font-bold tracking-wide uppercase">
-                Vector Search Engine
+<body class="bg-slate-50 min-h-screen text-slate-900 selection:bg-indigo-100 selection:text-indigo-700">
+    <!-- Modal for Full Document -->
+    <div id="modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8 bg-slate-900/40 backdrop-blur-sm">
+        <div class="bg-white w-full max-w-5xl h-full max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0">
+                <div>
+                    <h2 id="modalTitle" class="text-xl font-bold text-slate-900">Document Content</h2>
+                    <p id="modalPath" class="text-xs font-medium text-slate-400 uppercase tracking-widest mt-0.5"></p>
+                </div>
+                <button onclick="closeModal()" class="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                    <svg class="w-6 h-6 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
             </div>
-            <h1 class="text-5xl font-black text-slate-900 tracking-tight leading-tight">
-                raglike-md
+            <div id="modalBody" class="flex-grow overflow-y-auto p-8 prose prose-slate max-w-none">
+                <pre id="rawContent" class="whitespace-pre-wrap text-slate-700 font-sans"></pre>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-5xl mx-auto px-6 py-12 md:py-24">
+        <!-- Header -->
+        <header class="text-center mb-16">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-600 text-[10px] font-extrabold uppercase tracking-[0.2em] mb-4">
+                <span class="relative flex h-2 w-2">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                </span>
+                High Performance Search
+            </div>
+            <h1 class="text-4xl md:text-6xl font-extrabold text-slate-900 tracking-tight mb-4">
+                raglike<span class="text-indigo-600">.md</span>
             </h1>
-            <p class="text-slate-500 text-xl max-w-2xl mx-auto font-medium">
-                Instant semantic search across your technical documentation.
+            <p class="text-slate-500 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed">
+                Hybrid semantic retrieval with smart chunking and HNSW indexing for your technical documentation.
             </p>
         </header>
 
-        <main>
-            <div class="relative group mb-12">
-                <div class="absolute -inset-1 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl blur opacity-25 group-focus-within:opacity-50 transition duration-1000 group-focus-within:duration-200"></div>
-                <div class="relative flex flex-col md:flex-row gap-3">
-                    <div class="relative flex-grow">
-                        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                            <svg class="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
-                        </div>
+        <!-- Search Bar -->
+        <div class="sticky top-6 z-40 mb-12">
+            <div class="relative group">
+                <div class="absolute -inset-1 bg-gradient-to-r from-indigo-500 via-blue-500 to-indigo-500 rounded-3xl blur opacity-20 group-focus-within:opacity-40 transition duration-500"></div>
+                <div class="relative flex items-center bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-200 p-2 overflow-hidden">
+                    <div class="flex items-center flex-grow pl-4">
+                        <svg class="h-6 w-6 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
                         <input 
                             type="text" 
                             id="searchQuery" 
-                            placeholder="How does the system initialize?" 
-                            class="w-full pl-11 p-5 rounded-xl bg-white border border-slate-200 shadow-sm focus:ring-0 focus:border-blue-500 outline-none transition-all text-lg"
+                            placeholder="Ask about architecture, setup, or features..." 
+                            class="w-full bg-transparent border-none focus:ring-0 px-4 py-4 text-lg md:text-xl font-medium placeholder:text-slate-300 outline-none"
+                            autocomplete="off"
                         >
                     </div>
                     <button 
                         id="searchButton"
-                        class="bg-slate-900 hover:bg-slate-800 text-white font-bold px-10 py-5 rounded-xl shadow-xl hover:shadow-2xl transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                        class="hidden md:flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-xl font-bold transition-all active:scale-95 shadow-lg shadow-indigo-200"
                     >
-                        <span>Search</span>
-                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                        </svg>
+                        Search
+                        <kbd class="hidden lg:inline-flex items-center h-5 px-1.5 font-sans text-[10px] font-medium text-indigo-300 border border-indigo-400 rounded bg-indigo-500">⏎</kbd>
                     </button>
                 </div>
             </div>
+        </div>
 
-            <div id="loading" class="hidden text-center py-12">
-                <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div>
-                <p class="mt-2 text-slate-500">Searching documents...</p>
+        <!-- Feedback & Results -->
+        <div id="loading" class="hidden text-center py-20">
+            <div class="inline-flex items-center gap-3 px-6 py-3 rounded-full bg-white border border-slate-100 shadow-sm">
+                <div class="animate-spin rounded-full h-4 w-4 border-2 border-indigo-500 border-t-transparent"></div>
+                <span class="text-slate-600 font-semibold text-sm">Traversing vector space...</span>
             </div>
+        </div>
 
-            <div id="results" class="space-y-6">
-                <!-- Results will be injected here -->
-            </div>
+        <div id="results" class="grid grid-cols-1 gap-6">
+            <!-- Cards will appear here -->
+        </div>
 
-            <div id="noResults" class="hidden text-center py-12 text-slate-500 italic">
-                No matching documents found.
+        <div id="noResults" class="hidden text-center py-24 bg-white rounded-3xl border-2 border-dashed border-slate-100">
+            <div class="text-slate-300 mb-4 flex justify-center">
+                <svg class="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9.172 9.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
             </div>
-        </main>
+            <p class="text-slate-500 text-lg font-medium">No chunks found for this query.</p>
+            <p class="text-slate-400 text-sm mt-1">Try broader terms or technical keywords.</p>
+        </div>
     </div>
 
     <script>
@@ -73,12 +110,12 @@
         const resultsContainer = document.getElementById('results');
         const loadingSpinner = document.getElementById('loading');
         const noResultsMessage = document.getElementById('noResults');
+        const modal = document.getElementById('modal');
 
         async function performSearch() {
             const query = searchInput.value.trim();
             if (!query) return;
 
-            // Reset UI
             resultsContainer.innerHTML = '';
             noResultsMessage.classList.add('hidden');
             loadingSpinner.classList.remove('hidden');
@@ -87,33 +124,44 @@
             try {
                 const response = await fetch('/search', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ query, limit: 10 }),
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query, limit: 12 }),
                 });
 
                 const data = await response.json();
 
                 if (data.success && data.results && data.results.length > 0) {
-                    data.results.forEach(result => {
+                    data.results.forEach((result, idx) => {
                         const card = document.createElement('div');
-                        card.className = 'bg-white p-6 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow';
+                        card.className = 'group relative bg-white border border-slate-200 p-8 rounded-[2rem] shadow-[0_4px_20px_rgb(0,0,0,0.02)] hover:shadow-[0_15px_40px_rgb(0,0,0,0.06)] hover:border-indigo-100 transition-all duration-300';
                         
-                        // Cosine distance: 0 is exact match, 2 is opposite.
-                        // We'll show a "Confidence" score based on (1 - distance).
-                        const score = Math.max(0, (1 - result.distance) * 100).toFixed(1);
+                        // RRF Score display (higher is better)
+                        const rrfScore = (result.rrf_score * 1000).toFixed(2);
                         
                         card.innerHTML = `
-                            <div class="flex justify-between items-start mb-4">
-                                <div>
-                                    <h3 class="text-lg font-bold text-blue-600 mb-1">${result.heading}</h3>
-                                    <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">${result.file_path}</p>
+                            <div class="flex flex-col md:flex-row justify-between items-start gap-4 mb-6">
+                                <div class="flex-grow">
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <span class="text-[10px] font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded uppercase tracking-wider">${result.file_path.split('.').pop()}</span>
+                                        <span class="text-xs font-semibold text-slate-400">${result.file_path}</span>
+                                    </div>
+                                    <h3 class="text-xl font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">${result.heading}</h3>
                                 </div>
-                                <span class="bg-blue-100 text-blue-800 text-xs font-bold px-2.5 py-1 rounded-full whitespace-nowrap">${score}% Match</span>
+                                <div class="flex flex-col items-end shrink-0">
+                                    <div class="text-2xl font-black text-indigo-500/20 group-hover:text-indigo-500/40 transition-colors leading-none">#${idx + 1}</div>
+                                    <div class="mt-2 text-[10px] font-bold px-2 py-1 rounded bg-slate-50 text-slate-500 border border-slate-100">${rrfScore} Hybrid Score</div>
+                                </div>
                             </div>
-                            <div class="prose prose-slate max-w-none">
-                                <p class="text-slate-700 leading-relaxed whitespace-pre-wrap">${result.content}</p>
+                            <div class="bg-slate-50/50 rounded-2xl p-6 mb-6">
+                                <p class="text-slate-600 leading-relaxed text-sm md:text-base whitespace-pre-wrap">${result.content}</p>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <button onclick="viewFullDoc('${result.file_path}')" class="text-sm font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1.5 px-4 py-2 rounded-xl hover:bg-indigo-50 transition-all">
+                                    View Full Document
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                    </svg>
+                                </button>
                             </div>
                         `;
                         resultsContainer.appendChild(card);
@@ -123,18 +171,46 @@
                 }
             } catch (error) {
                 console.error('Search error:', error);
-                resultsContainer.innerHTML = '<div class="bg-red-50 text-red-700 p-4 rounded-lg border border-red-200">' +
-                    'Failed to perform search. Please ensure the API is running.' +
-                '</div>';
+                resultsContainer.innerHTML = '<div class="bg-red-50 text-red-600 p-8 rounded-3xl border border-red-100 text-center font-bold">Failed to reach the API server.</div>';
             } finally {
                 loadingSpinner.classList.add('hidden');
                 searchButton.disabled = false;
             }
         }
 
+        async function viewFullDoc(path) {
+            try {
+                const res = await fetch(`/read?path=${encodeURIComponent(path)}`);
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('modalTitle').innerText = path.split('/').pop();
+                    document.getElementById('modalPath').innerText = path;
+                    document.getElementById('rawContent').innerText = data.content;
+                    modal.classList.remove('hidden');
+                    document.body.style.overflow = 'hidden';
+                }
+            } catch (err) {
+                alert('Could not load document content.');
+            }
+        }
+
+        function closeModal() {
+            modal.classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+
         searchButton.addEventListener('click', performSearch);
         searchInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') performSearch();
+        });
+
+        // Shortcuts
+        window.addEventListener('keydown', (e) => {
+            if (e.key === '/' && document.activeElement !== searchInput) {
+                e.preventDefault();
+                searchInput.focus();
+            }
+            if (e.key === 'Escape') closeModal();
         });
     </script>
 </body>

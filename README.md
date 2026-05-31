@@ -1,8 +1,20 @@
 # raglike-md 🚀
 
-A high-performance, local semantic search engine for Markdown documentation. Built with **Bun**, **PGlite (pgvector)**, and **Xenova Transformers**.
+A high-performance, local semantic search engine for Markdown documentation. Built with **Bun**, **PGlite (pgvector)**, **External Postgres Support**, and **Xenova Transformers**.
 
-`raglike-md` recursively crawls your documentation folders, generates embeddings locally using the `all-MiniLM-L6-v2` model, and provides a semantic search interface via **Model Context Protocol (MCP)** or a **REST API**.
+`raglike-md` recursively crawls your documentation, generates granular embeddings locally using the `all-MiniLM-L6-v2` model, and provides a semantic search interface via **Model Context Protocol (MCP)** or a **REST API**.
+
+---
+
+## ✨ Key Features
+
+- **Hybrid Search (Vector + Full-Text):** Combines conceptual similarity (pgvector) with exact keyword matching (tsvector). Ranked using **Reciprocal Rank Fusion (RRF)** for superior precision.
+- **HNSW Acceleration:** Automatically implements Hierarchical Navigable Small World indexing for sub-second searches across massive datasets.
+- **Smart Chunking:** Uses a sliding window strategy with overlap (~600 chars) to ensure AI models receive complete context without losing semantic continuity.
+- **Dual Database Architecture:** Automatically switches between local persistent **PGlite** (WASM-powered) and external **Postgres**.
+- **Parallel Ingestion:** High-speed indexing that embeds and batches multiple document chunks simultaneously.
+- **MCP & REST API:** Native support for the Model Context Protocol and standard HTTP interfaces.
+
 
 ---
 
@@ -11,58 +23,40 @@ A high-performance, local semantic search engine for Markdown documentation. Bui
 The system follows a "RAG-lite" (Retrieval-Augmented Generation) architecture, focusing on the retrieval layer. For detailed information, see our [Architecture Documentation](docs/architecture/overview.md).
 
 - **[Overview](docs/architecture/overview.md)**: High-level system design and component breakdown.
-- **[Vector Engine](docs/architecture/vector-engine.md)**: Deep dive into PGlite, embeddings, and indexing.
-- **[Server Modes](docs/architecture/server-modes.md)**: Details on MCP vs HTTP API configurations.
-- **[Search Protocol](docs/architecture/protocol.md)**: API and tool communication specifications.
+- **[Vector Engine](docs/architecture/vector-engine.md)**: Deep dive into persistence, Dual DB, and granular chunking.
+- **[Search Protocol](docs/architecture/protocol.md)**: API and MCP tool communication specifications.
 
 ---
 
-## 🐳 Running with Docker (Recommended)
+## 🐳 Running with Docker Compose (Recommended)
 
-Docker is the easiest way to run `raglike-md` as it comes pre-packaged with all native dependencies and model weights.
+The easiest way to run the full stack (Search Engine + Postgres Database).
 
-### 1. Build the Image
-```bash
-docker build -t raglike-md .
-```
-
-### 2. Run as a REST API
-Mount your local documentation folder to the container's `/app/docs` directory:
-```bash
-docker run -d \
-  -p 4321:4321 \
-  -v /path/to/your/docs:/app/docs \
-  --name raglike-md \
-  raglike-md --api
-```
-
-### 4. Run with Environment Variables
-You can control the server modes using environment variables (`ENABLE_API` and `ENABLE_MCP`).
-```bash
-docker run -d \
-  -p 4321:4321 \
-  -e ENABLE_API=true \
-  -e ENABLE_MCP=true \
-  -v /path/to/your/docs:/app/docs \
-  --name raglike-md \
-  raglike-md
-```
-
-### 5. Using Docker Compose
-A `docker-compose.yml` is provided:
 ```yaml
 services:
+  db:
+    image: ankane/pgvector:latest
+    environment:
+      - POSTGRES_DB=raglike
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=pass
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
   raglike-md:
-    build: .
+    image: raglike-md
     ports:
       - "4321:4321"
     environment:
       - ENABLE_API=true
       - ENABLE_MCP=true
+    depends_on:
+      db:
+        condition: service_healthy
     volumes:
       - ./docs:/app/docs
-    restart: unless-stopped
 ```
+
 Run it with:
 ```bash
 docker compose up -d
@@ -84,19 +78,20 @@ bun install
 bun run src/index.ts --api
 ```
 
-### Run Unit Tests
-```bash
-bun test
-```
+### Environment Variables
+- `POSTGRES_URL`: (Optional) Connection string for an external Postgres database.
+- `ENABLE_API`: Set to `true` to enable the REST API.
+- `ENABLE_MCP`: Set to `true` to enable the MCP server.
 
 ---
 
 ## 📡 API Usage
 
-### Semantic Search
+### 1. Semantic Search (Granular)
 **Endpoint:** `POST http://localhost:4321/search`
 
-**Payload:**
+Returns relevant paragraphs with hierarchical context.
+
 ```json
 {
   "query": "How do I configure the protocol?",
@@ -104,25 +99,15 @@ bun test
 }
 ```
 
-**Response:**
-```json
-{
-  "success": true,
-  "results": [
-    {
-      "file_path": "docs/architecture/protocol.md",
-      "heading": "# Protocol",
-      "content": "Detailed documentation content...",
-      "distance": 0.4215
-    }
-  ]
-}
-```
+### 2. Read Full Document
+**Endpoint:** `GET http://localhost:4321/read?path=docs/setup.md`
+
+Retrieves the raw Markdown content of a specific file.
 
 ---
 
 ## 📝 Logging
-Logs are stored in `.logs/app.log` using the **Pino** logger. The system is tuned for production with minimal I/O overhead.
+Logs are stored in `.logs/app.log` using the **Pino** logger. The system detects its environment and logs database connection status accordingly.
 
 ## ⚖️ License
 MIT

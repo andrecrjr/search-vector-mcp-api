@@ -7,9 +7,14 @@ import * as path from "path";
 const engine = new VectorEngine();
 await engine.initialize();
 
-// Recursively process files inside the local docs folder
-const docsDirectoryPath = path.join(process.cwd(), "docs");
-await engine.indexDirectory(docsDirectoryPath);
+// Only ingest if the database is currently empty
+if (!(await engine.hasData())) {
+  logger.info("Database is empty. Starting initial ingestion of 'docs' directory...");
+  const docsDirectoryPath = path.join(process.cwd(), "docs");
+  await engine.indexDirectory(docsDirectoryPath);
+} else {
+  logger.info("Persistent database already contains data. Skipping auto-ingestion.");
+}
 
 const includeApi = process.env.ENABLE_API === "true" || Bun.argv.includes("--api");
 const includeMcp = process.env.ENABLE_MCP === "true" || Bun.argv.includes("--mcp") || (!includeApi && !process.env.ENABLE_API);

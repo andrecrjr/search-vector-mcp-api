@@ -1,5 +1,6 @@
 import { VectorEngine } from "./engine";
 import { logger } from "./logger";
+import * as path from "path";
 
 export function startHttpServer(engine: VectorEngine) {
   Bun.serve({
@@ -10,7 +11,21 @@ export function startHttpServer(engine: VectorEngine) {
       
       // Serve index.html on the root path
       if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) {
-        return new Response(Bun.file("index.html"));
+        const indexPath = path.join(process.cwd(), "index.html");
+        return new Response(Bun.file(indexPath));
+      }
+
+      if (req.method === "GET" && url.pathname === "/read") {
+        const filePath = url.searchParams.get("path");
+        if (!filePath) return Response.json({ error: "Missing path parameter" }, { status: 400 });
+        
+        try {
+          const content = await engine.readDocument(filePath);
+          if (content === null) return Response.json({ error: "File not found" }, { status: 404 });
+          return Response.json({ success: true, content });
+        } catch (err: any) {
+          return Response.json({ error: err.message }, { status: 403 });
+        }
       }
 
       if (req.method === "POST" && url.pathname === "/search") {

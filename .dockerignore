@@ -5,3 +5,4 @@ test-docs-sandbox
 .gitignore
 bun.lockb
 *.log
+.db/

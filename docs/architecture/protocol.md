@@ -1,50 +1,56 @@
 # Search Protocol
 
-This document defines the semantic search protocol used between the server components and the engine.
+`raglike-md` provides two primary interfaces for semantic search and document retrieval.
 
-## Query Protocol
-All search requests must provide a conceptual query string.
+## 1. Model Context Protocol (MCP)
+The preferred interface for AI agents.
 
-### MCP Tool: `semantic_markdown_search`
-- **Arguments**:
-  - `query` (string): The natural language query.
-  - `limit` (number, optional): Max results to return (default: 3).
+### Tools
+- **`semantic_markdown_search`**:
+    - **Description**: Conceptual search across the workspace.
+    - **Input**: `{ "query": string, "limit": number }`
+    - **Output**: Returns a formatted list of granular paragraph chunks, including the file path and heading.
+- **`get_full_document`**:
+    - **Description**: Retrieves the raw markdown content of a file. Use this after finding a relevant file via search.
+    - **Input**: `{ "file_path": string }`
+    - **Output**: The complete raw content of the Markdown file.
 
-### HTTP API: `/search`
-- **Method**: `POST`
-- **Headers**: `Content-Type: application/json`
-- **Body**:
+---
+
+## 2. HTTP REST API
+A standard interface for web clients and external tools.
+
+### Endpoints
+
+#### `POST /search`
+Conceptual search returning granular results.
+- **Payload**:
+  ```json
+  { "query": "database persistence", "limit": 3 }
+  ```
+- **Response**:
   ```json
   {
-    "query": "string",
-    "limit": number
+    "success": true,
+    "results": [
+      {
+        "file_path": "docs/architecture/vector-engine.md",
+        "heading": "## Persistence",
+        "content": "Local PGlite data is saved in the .db directory...",
+        "distance": 0.4215
+      }
+    ]
   }
   ```
 
-## Response Protocol
-The response is a collection of markdown chunks that most closely match the query.
-
-### Data Format
-Each match includes:
-- `file_path`: Path to the source markdown file.
-- `heading`: The nearest header for the chunk.
-- `content`: The actual text content.
-- `distance`: The cosine distance score (lower is more similar).
-
-### MCP Output
-Matches are formatted as a single markdown string containing the file path, heading, score, and content for each result.
-
-### HTTP JSON Response
-```json
-{
-  "success": true,
-  "results": [
-    {
-      "file_path": "...",
-      "heading": "...",
-      "content": "...",
-      "distance": 0.1234
-    }
-  ]
-}
-```
+#### `GET /read`
+Full document retrieval.
+- **Query Parameters**: `path` (relative path to the markdown file).
+- **Example**: `/read?path=docs/setup.md`
+- **Response**:
+  ```json
+  {
+    "success": true,
+    "content": "# Full Markdown Content..."
+  }
+  ```
