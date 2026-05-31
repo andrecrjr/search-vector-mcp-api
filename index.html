@@ -55,27 +55,41 @@
 
         <!-- Search Bar -->
         <div class="sticky top-6 z-40 mb-12">
-            <div class="relative group">
-                <div class="absolute -inset-1 bg-gradient-to-r from-indigo-500 via-blue-500 to-indigo-500 rounded-3xl blur opacity-20 group-focus-within:opacity-40 transition duration-500"></div>
-                <div class="relative flex items-center bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-200 p-2 overflow-hidden">
-                    <div class="flex items-center flex-grow pl-4">
-                        <svg class="h-6 w-6 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
-                        <input 
-                            type="text" 
-                            id="searchQuery" 
-                            placeholder="Ask about architecture, setup, or features..." 
-                            class="w-full bg-transparent border-none focus:ring-0 px-4 py-4 text-lg md:text-xl font-medium placeholder:text-slate-300 outline-none"
-                            autocomplete="off"
+            <div class="flex flex-col md:flex-row gap-4">
+                <div class="relative group flex-grow">
+                    <div class="absolute -inset-1 bg-gradient-to-r from-indigo-500 via-blue-500 to-indigo-500 rounded-3xl blur opacity-20 group-focus-within:opacity-40 transition duration-500"></div>
+                    <div class="relative flex items-center bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-200 p-2 overflow-hidden">
+                        <div class="flex items-center flex-grow pl-4">
+                            <svg class="h-6 w-6 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            <input 
+                                type="text" 
+                                id="searchQuery" 
+                                placeholder="Ask about architecture, setup, or features..." 
+                                class="w-full bg-transparent border-none focus:ring-0 px-4 py-4 text-lg md:text-xl font-medium placeholder:text-slate-300 outline-none"
+                                autocomplete="off"
+                            >
+                        </div>
+                        <button 
+                            id="searchButton"
+                            class="hidden md:flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-xl font-bold transition-all active:scale-95 shadow-lg shadow-indigo-200"
                         >
+                            Search
+                            <kbd class="hidden lg:inline-flex items-center h-5 px-1.5 font-sans text-[10px] font-medium text-indigo-300 border border-indigo-400 rounded bg-indigo-500">⏎</kbd>
+                        </button>
                     </div>
+                </div>
+                <div class="flex shrink-0">
+                    <input type="file" id="pdfInput" class="hidden" accept="application/pdf">
                     <button 
-                        id="searchButton"
-                        class="hidden md:flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-xl font-bold transition-all active:scale-95 shadow-lg shadow-indigo-200"
+                        onclick="document.getElementById('pdfInput').click()"
+                        class="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-6 py-4 rounded-2xl font-bold transition-all active:scale-95 shadow-sm"
                     >
-                        Search
-                        <kbd class="hidden lg:inline-flex items-center h-5 px-1.5 font-sans text-[10px] font-medium text-indigo-300 border border-indigo-400 rounded bg-indigo-500">⏎</kbd>
+                        <svg class="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                        </svg>
+                        Upload PDF
                     </button>
                 </div>
             </div>
@@ -85,15 +99,15 @@
         <div id="loading" class="hidden text-center py-20">
             <div class="inline-flex items-center gap-3 px-6 py-3 rounded-full bg-white border border-slate-100 shadow-sm">
                 <div class="animate-spin rounded-full h-4 w-4 border-2 border-indigo-500 border-t-transparent"></div>
-                <span class="text-slate-600 font-semibold text-sm">Traversing vector space...</span>
+                <span id="loadingText" class="text-slate-600 font-semibold text-sm">Traversing vector space...</span>
             </div>
         </div>
 
-        <div id="results" class="grid grid-cols-1 gap-6">
+        <div id="results" class="grid grid-cols-1 gap-6 mb-12">
             <!-- Cards will appear here -->
         </div>
 
-        <div id="noResults" class="hidden text-center py-24 bg-white rounded-3xl border-2 border-dashed border-slate-100">
+        <div id="noResults" class="hidden text-center py-24 bg-white rounded-3xl border-2 border-dashed border-slate-100 mb-12">
             <div class="text-slate-300 mb-4 flex justify-center">
                 <svg class="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9.172 9.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -102,6 +116,17 @@
             <p class="text-slate-500 text-lg font-medium">No chunks found for this query.</p>
             <p class="text-slate-400 text-sm mt-1">Try broader terms or technical keywords.</p>
         </div>
+
+        <!-- Knowledge Base -->
+        <section class="mt-12">
+            <div class="flex items-center justify-between mb-8">
+                <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Knowledge Base</h2>
+                <span id="docCount" class="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded">0 Documents</span>
+            </div>
+            <div id="docList" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <!-- Doc items will appear here -->
+            </div>
+        </section>
     </div>
 
     <script>
@@ -109,8 +134,12 @@
         const searchButton = document.getElementById('searchButton');
         const resultsContainer = document.getElementById('results');
         const loadingSpinner = document.getElementById('loading');
+        const loadingText = document.getElementById('loadingText');
         const noResultsMessage = document.getElementById('noResults');
         const modal = document.getElementById('modal');
+        const pdfInput = document.getElementById('pdfInput');
+        const docList = document.getElementById('docList');
+        const docCount = document.getElementById('docCount');
 
         async function performSearch() {
             const query = searchInput.value.trim();
@@ -118,6 +147,7 @@
 
             resultsContainer.innerHTML = '';
             noResultsMessage.classList.add('hidden');
+            loadingText.innerText = 'Traversing vector space...';
             loadingSpinner.classList.remove('hidden');
             searchButton.disabled = true;
 
@@ -178,6 +208,67 @@
             }
         }
 
+        async function loadDocs() {
+            try {
+                const res = await fetch('/list-docs');
+                const data = await res.json();
+                if (data.success) {
+                    docList.innerHTML = '';
+                    const mdFiles = data.docs.filter(f => f.endsWith('.md'));
+                    docCount.innerText = `${mdFiles.length} Documents`;
+                    
+                    mdFiles.forEach(file => {
+                        const item = document.createElement('div');
+                        item.className = 'bg-white border border-slate-100 p-4 rounded-2xl hover:border-indigo-200 hover:shadow-sm transition-all cursor-pointer group';
+                        item.onclick = () => viewFullDoc('docs/' + file);
+                        item.innerHTML = `
+                            <div class="flex items-center gap-3">
+                                <div class="p-2 rounded-lg bg-indigo-50 text-indigo-500 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                </div>
+                                <span class="text-sm font-semibold text-slate-700 truncate">${file.split('/').pop()}</span>
+                            </div>
+                        `;
+                        docList.appendChild(item);
+                    });
+                }
+            } catch (err) {
+                console.error('Failed to load docs:', err);
+            }
+        }
+
+        pdfInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            loadingText.innerText = 'Converting PDF to Markdown...';
+            loadingSpinner.classList.remove('hidden');
+
+            try {
+                const res = await fetch('/ingest-pdf', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('PDF successfully ingested!');
+                    loadDocs();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (err) {
+                alert('Upload failed: ' + err.message);
+            } finally {
+                loadingSpinner.classList.add('hidden');
+                pdfInput.value = '';
+            }
+        });
+
         async function viewFullDoc(path) {
             try {
                 const res = await fetch(`/read?path=${encodeURIComponent(path)}`);
@@ -212,6 +303,9 @@
             }
             if (e.key === 'Escape') closeModal();
         });
+
+        // Init
+        loadDocs();
     </script>
 </body>
 </html>

@@ -114,7 +114,7 @@ export class VectorEngine {
     logger.info({ totalFiles: targetFiles.length }, "Recursive workspace folder ingestion complete.");
   }
 
-  private async indexSingleFile(filePath: string) {
+  public async indexSingleFile(filePath: string) {
     const relativePath = path.relative(process.cwd(), filePath);
     const rawContent = fs.readFileSync(filePath, "utf-8");
     
