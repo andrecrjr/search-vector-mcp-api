@@ -11,11 +11,14 @@ await engine.initialize();
 const docsDirectoryPath = path.join(process.cwd(), "docs");
 await engine.indexDirectory(docsDirectoryPath);
 
-const runAsApi = Bun.argv.includes("--api");
+const includeApi = process.env.ENABLE_API === "true" || Bun.argv.includes("--api");
+const includeMcp = process.env.ENABLE_MCP === "true" || Bun.argv.includes("--mcp") || (!includeApi && !process.env.ENABLE_API);
 
-if (runAsApi) {
+if (includeApi) {
   startHttpServer(engine);
-} else {
+}
+
+if (includeMcp) {
   // Fall back to standard input/output streams required by MCP hosts
   await startMcpServer(engine);
 }

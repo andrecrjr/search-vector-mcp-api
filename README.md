@@ -36,19 +36,36 @@ docker run -d \
   search-docs-api --api
 ```
 
-### 3. Run as an MCP Server
-Configure your MCP host (e.g., Cursor or Claude Desktop) to use the Docker container:
-```json
-"search-docs-api": {
-  "command": "docker",
-  "args": [
-    "run",
-    "-i",
-    "--rm",
-    "-v", "/path/to/your/docs:/app/docs",
-    "search-docs-api"
-  ]
-}
+### 4. Run with Environment Variables
+You can control the server modes using environment variables (`ENABLE_API` and `ENABLE_MCP`).
+```bash
+docker run -d \
+  -p 4321:4321 \
+  -e ENABLE_API=true \
+  -e ENABLE_MCP=true \
+  -v /path/to/your/docs:/app/docs \
+  --name search-docs-api \
+  search-docs-api
+```
+
+### 5. Using Docker Compose
+A `docker-compose.yml` is provided:
+```yaml
+services:
+  search-docs-api:
+    build: .
+    ports:
+      - "4321:4321"
+    environment:
+      - ENABLE_API=true
+      - ENABLE_MCP=true
+    volumes:
+      - ./docs:/app/docs
+    restart: unless-stopped
+```
+Run it with:
+```bash
+docker compose up -d
 ```
 
 ---

@@ -1,0 +1,12 @@
+services:
+  search-docs-api:
+    build: .
+    ports:
+      - "4321:4321"
+    environment:
+      - ENABLE_API=true
+      - ENABLE_MCP=true
+    volumes:
+      - ./docs:/app/docs
+      - ./.logs:/app/.logs
+    restart: unless-stopped
