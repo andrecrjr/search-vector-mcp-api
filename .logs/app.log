@@ -1,0 +1,10 @@
+{"level":30,"time":"2026-05-31T05:17:21.232Z","msg":"PGlite Vector Engine database subsystem fully ready."}
+{"level":30,"time":"2026-05-31T05:17:21.252Z","totalFiles":1,"msg":"Recursive workspace folder ingestion complete."}
+{"level":30,"time":"2026-05-31T05:17:53.430Z","msg":"PGlite Vector Engine database subsystem fully ready."}
+{"level":30,"time":"2026-05-31T05:17:53.451Z","totalFiles":1,"msg":"Recursive workspace folder ingestion complete."}
+{"level":30,"time":"2026-05-31T05:18:39.629Z","msg":"PGlite Vector Engine database subsystem fully ready."}
+{"level":30,"time":"2026-05-31T05:18:39.662Z","totalFiles":2,"msg":"Recursive workspace folder ingestion complete."}
+{"level":30,"time":"2026-05-31T05:18:39.671Z","msg":"HTTP Server online running on port 4321."}
+{"level":30,"time":"2026-05-31T05:18:39.671Z","msg":"Application context fully stabilized and active."}
+{"level":30,"time":"2026-05-31T05:23:32.006Z","msg":"PGlite Vector Engine database subsystem fully ready."}
+{"level":30,"time":"2026-05-31T05:23:32.027Z","totalFiles":1,"msg":"Recursive workspace folder ingestion complete."}
