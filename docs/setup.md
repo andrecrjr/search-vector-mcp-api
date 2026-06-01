@@ -18,6 +18,62 @@ To set up this system, you need [Bun](https://bun.sh) installed.
    bun start --api
    ```
 
+## Model Context Protocol (MCP) Setup
+
+`raglike-md` implements the Model Context Protocol, allowing it to be used as a tool provider for AI assistants like Claude Desktop.
+
+### Claude Desktop Configuration
+
+To use `raglike-md` with Claude Desktop, add the following to your `claude_desktop_config.json` (usually located at `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS or `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
+
+```json
+{
+  "mcpServers": {
+    "raglike-md": {
+      "command": "bun",
+      "args": ["run", "src/index.ts", "--mcp"],
+      "cwd": "/path/to/your/raglike-md",
+      "env": {
+        "POSTGRES_URL": "postgres://user:pass@localhost:5432/raglike"
+      }
+    }
+  }
+}
+```
+
+*Note: Replace `/path/to/your/raglike-md` with the actual absolute path to the project directory.*
+
+## HTTP API Setup
+
+The REST API provides a simple way to interact with the search engine from any web application.
+
+### Start the API Server
+```bash
+bun start --api
+```
+
+The server will be available at `http://localhost:4321`.
+
+### Environment Variables
+- `ENABLE_API`: Set to `true` to enable the REST API.
+- `ENABLE_MCP`: Set to `true` to enable the MCP server.
+- `HOST`: The hostname/interface to bind the server to (default: `0.0.0.0` to allow all network access).
+- `POSTGRES_URL`: Connection string for an external Postgres database (e.g., `postgres://user:pass@localhost:5432/raglike`). If not provided, the engine defaults to a local PGlite instance in the `.db/` folder.
+
+## Docker Setup
+
+The easiest way to run the full stack (Search Engine + Postgres Database) is using Docker Compose.
+
+```bash
+# Start the stack
+docker compose up -d
+
+# View logs
+docker compose logs -f raglike-md
+```
+
+The Docker setup automatically configures the environment variables and volumes for persistent data.
+
 ## Detailed Documentation
 
 For more information on how the system works and how to integrate it, refer to the following documents:
@@ -25,3 +81,4 @@ For more information on how the system works and how to integrate it, refer to t
 - [Architecture Overview](architecture/overview.md)
 - [Server Modes & Usage](architecture/server-modes.md)
 - [Vector Engine Details](architecture/vector-engine.md)
+- [Search Protocol](architecture/protocol.md)

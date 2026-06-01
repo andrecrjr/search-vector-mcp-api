@@ -20,11 +20,13 @@ const includeApi = process.env.ENABLE_API === "true" || Bun.argv.includes("--api
 const includeMcp = process.env.ENABLE_MCP === "true" || Bun.argv.includes("--mcp") || (!includeApi && !process.env.ENABLE_API);
 
 if (includeApi) {
-  startHttpServer(engine);
+  // HTTP server can now host both REST and MCP (via SSE)
+  await startHttpServer(engine);
 }
 
+// Always start Stdio MCP if enabled, even if API is also running.
+// This ensures compatibility with hosts like Claude Desktop.
 if (includeMcp) {
-  // Fall back to standard input/output streams required by MCP hosts
   await startMcpServer(engine);
 }
 

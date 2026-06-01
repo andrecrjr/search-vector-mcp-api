@@ -18,13 +18,60 @@ A high-performance, local semantic search engine for Markdown documentation. Bui
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ Architecture & Documentation
 
-The system follows a "RAG-lite" (Retrieval-Augmented Generation) architecture, focusing on the retrieval layer. For detailed information, see our [Architecture Documentation](docs/architecture/overview.md).
+The system follows a "RAG-lite" (Retrieval-Augmented Generation) architecture, focusing on the retrieval layer.
 
-- **[Overview](docs/architecture/overview.md)**: High-level system design and component breakdown.
-- **[Vector Engine](docs/architecture/vector-engine.md)**: Deep dive into persistence, Dual DB, and granular chunking.
+- **[Quick Setup Guide](docs/setup.md)**: How to get up and running quickly.
+- **[Architecture Overview](docs/architecture/overview.md)**: High-level system design and component breakdown.
+- **[Server Modes & Usage](docs/architecture/server-modes.md)**: Deep dive into MCP Tools and API Endpoints.
 - **[Search Protocol](docs/architecture/protocol.md)**: API and MCP tool communication specifications.
+
+---
+
+## 📡 Model Context Protocol (MCP) Setup
+
+`raglike-md` can be used as a tool provider for AI assistants like Claude Desktop.
+
+Add this to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "raglike-md": {
+      "command": "bun",
+      "args": ["run", "/path/to/raglike-md/src/index.ts", "--mcp"],
+      "env": {
+        "POSTGRES_URL": "postgres://user:pass@localhost:5432/raglike"
+      }
+    }
+  }
+}
+```
+
+---
+
+## 🌐 API Usage
+
+Start the API server:
+```bash
+bun start --api
+```
+
+### 1. Semantic Search
+**Endpoint:** `POST http://localhost:4321/search`
+
+```json
+{
+  "query": "How do I configure the protocol?",
+  "limit": 3
+}
+```
+
+### 2. Upload Document
+**Endpoint:** `POST http://localhost:4321/upload` (multipart/form-data)
+
+Upload a `.md` or `.pdf` file to be indexed immediately.
 
 ---
 
@@ -73,36 +120,11 @@ If you have [Bun](https://bun.sh) installed, you can run the project directly:
 bun install
 ```
 
-### Run Search API
-```bash
-bun run src/index.ts --api
-```
-
 ### Environment Variables
 - `POSTGRES_URL`: (Optional) Connection string for an external Postgres database.
 - `ENABLE_API`: Set to `true` to enable the REST API.
 - `ENABLE_MCP`: Set to `true` to enable the MCP server.
-
----
-
-## 📡 API Usage
-
-### 1. Semantic Search (Granular)
-**Endpoint:** `POST http://localhost:4321/search`
-
-Returns relevant paragraphs with hierarchical context.
-
-```json
-{
-  "query": "How do I configure the protocol?",
-  "limit": 3
-}
-```
-
-### 2. Read Full Document
-**Endpoint:** `GET http://localhost:4321/read?path=docs/setup.md`
-
-Retrieves the raw Markdown content of a specific file.
+- `HOST`: The hostname/interface to bind to (default: `0.0.0.0`).
 
 ---
 

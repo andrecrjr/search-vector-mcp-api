@@ -7,21 +7,34 @@ This is the default mode, optimized for integration with AI hosts like Claude De
 
 - **Transport**: Standard IO (stdin/stdout).
 - **Communication Protocol**: JSON-RPC based Model Context Protocol.
-- **Capabilities**: Exposes tools for semantic search (`semantic_markdown_search`) and full document retrieval (`get_full_document`).
+
+### Tools Available
+- `semantic_markdown_search`: Searches through nested workspace markdown files using local pgvector embeddings.
+- `read_chunk_neighbors`: Fetches the text immediately preceding and following a specific chunk. Useful for expanding context around a search result.
+- `get_full_document`: Retrieves the full raw markdown content of a file.
 
 ### Usage
 ```bash
 bun start
 ```
 
-## 2. HTTP API Mode
-This mode is useful for standalone use or integration with traditional web applications.
+## 2. HTTP API Mode (Unified)
+This mode is useful for standalone use, integration with traditional web applications, or remote MCP access.
 
 - **Transport**: HTTP/TCP.
 - **Port**: 4321 (default).
-- **Endpoints**: 
-    - `POST /search`: Granular conceptual search.
-    - `GET /read`: Full raw document retrieval.
+
+### Endpoints
+- **`/mcp`**: Unified endpoint for MCP-over-HTTP (Streamable HTTP). 
+    - `GET /mcp`: Establish an SSE stream.
+    - `POST /mcp`: Send JSON-RPC messages.
+    - `DELETE /mcp`: Close the session.
+- `GET /list-docs`: Lists all indexed markdown documents.
+- `GET /read?path=...`: Retrieves the full raw markdown content of a file.
+- `POST /search`: Conceptual search using local embeddings. Expects JSON body: `{"query": "...", "limit": 3}`.
+- `POST /upload`: Uploads a `.md` or `.pdf` file to the `docs/` directory and indexes it immediately. Expects `multipart/form-data`.
+- `DELETE /doc?path=...`: Removes a document from both the filesystem and the vector database.
+- `GET /index.html`: Serves a simple web interface for searching and managing documents.
 
 ### Usage
 ```bash

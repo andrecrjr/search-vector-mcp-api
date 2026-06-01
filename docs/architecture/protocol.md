@@ -5,11 +5,19 @@
 ## 1. Model Context Protocol (MCP)
 The preferred interface for AI agents.
 
+### Transports
+- **Stdio**: Used when running via CLI (e.g., in Claude Desktop).
+- **HTTP (SSE)**: Available at `/mcp` when the API server is running. This implements the **Streamable HTTP** specification.
+
 ### Tools
 - **`semantic_markdown_search`**:
     - **Description**: Conceptual search across the workspace.
     - **Input**: `{ "query": string, "limit": number }`
     - **Output**: Returns a formatted list of granular paragraph chunks, including the file path and heading.
+- **`read_chunk_neighbors`**:
+    - **Description**: Fetches the text immediately preceding and following a specific chunk.
+    - **Input**: `{ "chunk_id": number }`
+    - **Output**: Returns the previous and next chunks if they exist.
 - **`get_full_document`**:
     - **Description**: Retrieves the raw markdown content of a file. Use this after finding a relevant file via search.
     - **Input**: `{ "file_path": string }`
@@ -22,21 +30,29 @@ A standard interface for web clients and external tools.
 
 ### Endpoints
 
+#### `ALL /mcp`
+Unified MCP-over-HTTP endpoint (Streamable HTTP).
+- **GET**: Establish an SSE event stream connection.
+- **POST**: Send JSON-RPC messages.
+- **DELETE**: Terminate the session.
+
+#### `GET /list-docs`
+Lists all indexed documents.
+- **Response**: `{ "success": true, "docs": [ { "name": string, "path": string, "lastModified": date, "size": number } ] }`
+
 #### `POST /search`
 Conceptual search returning granular results.
-- **Payload**:
-  ```json
-  { "query": "database persistence", "limit": 3 }
-  ```
+- **Payload**: `{ "query": string, "limit": number }`
 - **Response**:
   ```json
   {
     "success": true,
     "results": [
       {
+        "id": number,
         "file_path": "docs/architecture/vector-engine.md",
         "heading": "## Persistence",
-        "content": "Local PGlite data is saved in the .db directory...",
+        "content": "...",
         "distance": 0.4215
       }
     ]
@@ -46,11 +62,14 @@ Conceptual search returning granular results.
 #### `GET /read`
 Full document retrieval.
 - **Query Parameters**: `path` (relative path to the markdown file).
-- **Example**: `/read?path=docs/setup.md`
-- **Response**:
-  ```json
-  {
-    "success": true,
-    "content": "# Full Markdown Content..."
-  }
-  ```
+- **Response**: `{ "success": true, "content": string }`
+
+#### `POST /upload`
+Upload and index a `.md` or `.pdf` file.
+- **Payload**: `multipart/form-data` with a `file` field.
+- **Response**: `{ "success": true, "path": string }`
+
+#### `DELETE /doc`
+Remove a document.
+- **Query Parameters**: `path`.
+- **Response**: `{ "success": true }`

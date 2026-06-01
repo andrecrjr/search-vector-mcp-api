@@ -4,7 +4,7 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprot
 import { VectorEngine } from "./engine";
 import { logger } from "./logger";
 
-export async function startMcpServer(engine: VectorEngine) {
+export function createMcpServer(engine: VectorEngine) {
   const server = new Server(
     { name: "raglike-md", version: "1.0.0" },
     { capabilities: { tools: {} } }
@@ -98,6 +98,11 @@ export async function startMcpServer(engine: VectorEngine) {
     throw new Error("Tool unexpected.");
   });
 
+  return server;
+}
+
+export async function startMcpServer(engine: VectorEngine) {
+  const server = createMcpServer(engine);
   const transport = new StdioServerTransport();
   await server.connect(transport);
   logger.info("MCP Layer linked cleanly via standard IO streams.");

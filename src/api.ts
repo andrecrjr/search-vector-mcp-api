@@ -4,14 +4,35 @@ import * as path from "path";
 import pdf2md from "pdf2md-ts";
 import { readdir } from "node:fs/promises";
 import * as fs from "node:fs";
+import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+import { createMcpServer } from "./mcp";
+import { randomUUID } from "node:crypto";
 
-export function startHttpServer(engine: VectorEngine) {
-  Bun.serve({
+export async function startHttpServer(engine: VectorEngine) {
+  const includeMcp = process.env.ENABLE_MCP === "true" || Bun.argv.includes("--mcp");
+  let mcpTransport: WebStandardStreamableHTTPServerTransport | undefined;
+
+  if (includeMcp) {
+    // Initialize stateful transport with session support
+    mcpTransport = new WebStandardStreamableHTTPServerTransport({
+      sessionIdGenerator: () => randomUUID()
+    });
+    const mcpServer = createMcpServer(engine);
+    await mcpServer.connect(mcpTransport);
+    logger.info("MCP Layer integrated into HTTP server via /mcp endpoint (Stateful SSE).");
+  }
+
+  const server = Bun.serve({
     port: 4321,
-    hostname: "0.0.0.0",
+    hostname: process.env.HOST || "0.0.0.0",
     async fetch(req) {
       const url = new URL(req.url);
       
+      // MCP HTTP Transport endpoint
+      if (includeMcp && mcpTransport && url.pathname === "/mcp") {
+        return await mcpTransport.handleRequest(req);
+      }
+
       // Serve index.html on the root path
       if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) {
         const indexPath = path.join(process.cwd(), "index.html");
@@ -120,5 +141,5 @@ export function startHttpServer(engine: VectorEngine) {
       return new Response("Not Found", { status: 404 });
     }
   });
-  logger.info("HTTP Server online running on 0.0.0.0:4321.");
+  logger.info(`server is running in ${server.hostname}:${server.port}`);
 }
