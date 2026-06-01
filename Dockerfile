@@ -9,7 +9,7 @@ COPY . .
 
 # Pre-cache the embedding model during build time into a specific directory
 RUN mkdir -p /app/.cache && \
-    HF_HOME=/app/.cache bun -e "import { pipeline } from '@xenova/transformers'; await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');"
+    HF_HOME=/app/.cache bun -e "import { pipeline } from '@huggingface/transformers'; await pipeline('feature-extraction', 'Xenova/all-mpnet-base-v2');"
 
 # Stage 2: Runtime Minimal Environment
 FROM oven/bun:latest AS runner

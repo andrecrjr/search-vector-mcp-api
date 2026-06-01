@@ -1,6 +1,6 @@
 import { PGlite } from "@electric-sql/pglite";
 import { vector } from "@electric-sql/pglite/vector";
-import { pipeline } from "@xenova/transformers";
+import { pipeline } from "@huggingface/transformers";
 import postgres from "postgres";
 import { logger } from "./logger";
 import * as fs from "fs";
@@ -12,7 +12,8 @@ export class VectorEngine {
   private extractor: any;
 
   async initialize() {
-    this.extractor = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
+    this.extractor = await pipeline("feature-extraction", "Xenova/all-mpnet-base-v2");
+    logger.info("Embedding model loaded: Xenova/all-mpnet-base-v2 (768D)");
     
     let dbUrl = process.env.POSTGRES_URL;
     const isDocker = fs.existsSync("/.dockerenv");
@@ -39,7 +40,7 @@ export class VectorEngine {
         file_path TEXT,
         heading TEXT,
         content TEXT,
-        embedding vector(384),
+        embedding vector(768),
         last_modified TIMESTAMP,
         word_count INTEGER,
         search_vector tsvector GENERATED ALWAYS AS (to_tsvector('english', heading || ' ' || content)) STORED
@@ -49,7 +50,7 @@ export class VectorEngine {
     // Step 4: Add HNSW index for high-performance vector search with tuned parameters
     // We drop and recreate to ensure parameters like m and ef_construction are applied
     await this.exec("DROP INDEX IF EXISTS idx_markdown_chunks_embedding;");
-    await this.exec("CREATE INDEX idx_markdown_chunks_embedding ON markdown_chunks USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);");
+    await this.exec("CREATE INDEX idx_markdown_chunks_embedding ON markdown_chunks USING hnsw (embedding vector_cosine_ops) WITH (m = 24, ef_construction = 100);");
     
     // Ensure new columns exist for existing databases
     try {
@@ -98,6 +99,9 @@ export class VectorEngine {
   private async generateEmbeddingString(text: string): Promise<string> {
     const output = await this.extractor(text, { pooling: "mean", normalize: true });
     const array = Array.from(output.data as Float32Array);
+    if (array.length !== 768) {
+      throw new Error(`Unexpected embedding dimension: expected 768, got ${array.length}`);
+    }
     return `[${array.join(",")}]`; // Native Postgres representation
   }
 
