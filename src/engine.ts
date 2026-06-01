@@ -12,7 +12,7 @@ export class VectorEngine {
   private extractor: any;
 
   async initialize() {
-    this.extractor = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
+    this.extractor = await pipeline("feature-extraction", "Xenova/all-mpnet-base-v2");
     
     let dbUrl = process.env.POSTGRES_URL;
     const isDocker = fs.existsSync("/.dockerenv");
@@ -33,13 +33,31 @@ export class VectorEngine {
     }
     
     await this.exec("CREATE EXTENSION IF NOT EXISTS vector;");
+
+    // Check if the table exists and if the embedding dimension matches
+    const tableExists = await this.query<{ exists: boolean }>(
+      "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'markdown_chunks')",
+      []
+    );
+
+    if (tableExists.rows[0].exists) {
+      const dimRes = await this.query<{ atttypmod: number }>(
+        "SELECT atttypmod FROM pg_attribute WHERE attrelid = 'markdown_chunks'::regclass AND attname = 'embedding'",
+        []
+      );
+      if (dimRes.rows.length > 0 && dimRes.rows[0].atttypmod !== 768) {
+        logger.warn({ oldDim: dimRes.rows[0].atttypmod, newDim: 768 }, "Vector dimension mismatch detected. Dropping table for re-ingestion.");
+        await this.exec("DROP TABLE markdown_chunks;");
+      }
+    }
+
     await this.exec(`
       CREATE TABLE IF NOT EXISTS markdown_chunks (
         id BIGSERIAL PRIMARY KEY,
         file_path TEXT,
         heading TEXT,
         content TEXT,
-        embedding vector(384),
+        embedding vector(768),
         last_modified TIMESTAMP,
         word_count INTEGER,
         search_vector tsvector GENERATED ALWAYS AS (to_tsvector('english', heading || ' ' || content)) STORED

@@ -22,8 +22,8 @@ To provide precise context to AI models while maintaining continuity, the engine
 6. **Filtering**: Chunks shorter than 5 characters (previously 50) are now indexed to ensure short but critical technical data is searchable.
 
 ## Embedding Model
-We use the **Xenova/all-MiniLM-L6-v2** model.
-- **Dimensions**: 384
+We use the **Xenova/all-mpnet-base-v2** model.
+- **Dimensions**: 768
 - **Runtime**: Local execution via `@xenova/transformers`.
 - **Normalization**: Vectors are normalized to ensure accurate cosine similarity measurements.
 
