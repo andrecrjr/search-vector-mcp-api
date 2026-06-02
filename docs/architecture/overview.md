@@ -30,5 +30,5 @@ An optional interface for traditional web clients.
 
 1. **Initialization**: On startup, the `VectorEngine` detects its environment (Docker, External URL, or Local) and initializes the appropriate database connection.
 2. **Persistence Check**: The engine checks if data already exists. If the database is populated, it skips the expensive re-indexing phase.
-3. **Indexing (Optional)**: If empty, the engine recursively scans the `docs/` folder, chunks the files into paragraphs, and populates the database.
-4. **Querying**: When a query is received, it is converted into an embedding, and a similarity search is performed. The user can then fetch the full file path returned by the search for deeper context.
+3. **Indexing (Optional)**: If empty, the engine recursively scans the `docs/` folder and the `.docs-ingested/` folder (for previously uploaded content), chunks the files into paragraphs, and populates the database.
+4. **Querying**: When a query is received, it is converted into an embedding, and a similarity search is performed. The user can then fetch the full file path returned by the search (from either folder) for deeper context.

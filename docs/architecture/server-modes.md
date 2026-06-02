@@ -35,7 +35,7 @@ This mode is useful for standalone use, integration with traditional web applica
 - `GET /list-docs`: Lists all indexed markdown documents.
 - `GET /read?path=...`: Retrieves the full raw markdown content of a file.
 - `POST /search`: Conceptual search using local embeddings. Expects JSON body: `{"query": "...", "limit": 3}`.
-- `POST /upload`: Uploads a `.md` or `.pdf` file to the `docs/` directory and indexes it immediately. Expects `multipart/form-data`.
+- `POST /upload`: Uploads a `.md` or `.pdf` file to the `.docs-ingested/` directory and indexes it immediately. Expects `multipart/form-data`.
 - `DELETE /doc?path=...`: Removes a document from both the filesystem and the vector database.
 - `GET /index.html`: Serves a simple web interface for searching and managing documents.
 

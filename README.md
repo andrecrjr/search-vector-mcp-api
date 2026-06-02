@@ -144,7 +144,7 @@ bun start --api
 ### 2. Upload Document
 **Endpoint:** `POST http://localhost:4321/upload` (multipart/form-data)
 
-Upload a `.md` or `.pdf` file to be indexed immediately.
+Upload a `.md` or `.pdf` file to the `.docs-ingested/` directory to be indexed immediately. This folder is git-ignored by default.
 
 ---
 

@@ -100,8 +100,13 @@ curl -X POST http://localhost:4321/search \
 
 ## 🏛 Architecture
 - **Engine (`src/engine.ts`):** Core logic for document crawling, cleaning (stripping base64), chunking, and indexing.
-- **API (`src/api.ts`):** Bun-native HTTP server hosting REST endpoints and SSE-based MCP.
+- **API (`src/api.ts`):** Bun-native HTTP server hosting REST endpoints and SSE-based MCP. Handles file uploads to `.docs-ingested/`.
 - **MCP (`src/mcp.ts`):** Tool definitions and logic for Model Context Protocol integration.
+
+## 📁 Storage Folders
+- `docs/`: Standard workspace documentation (committed to version control).
+- `.docs-ingested/`: Documents uploaded via the frontend (git-ignored).
+- `.db/`: Persistent PGlite database storage.
 
 ## 🚀 Development Workflows
 

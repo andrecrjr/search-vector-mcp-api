@@ -42,25 +42,32 @@ export async function startHttpServer(engine: VectorEngine) {
 
       if (req.method === "GET" && url.pathname === "/list-docs") {
         try {
-          const docsDir = path.join(process.cwd(), "docs");
-          const entries = await readdir(docsDir, { recursive: true, withFileTypes: true });
+          const rootDirs = ["docs", ".docs-ingested"];
+          const allDocs: any[] = [];
+
+          for (const dirName of rootDirs) {
+            const dirPath = path.join(process.cwd(), dirName);
+            if (!fs.existsSync(dirPath)) continue;
+
+            const entries = await readdir(dirPath, { recursive: true, withFileTypes: true });
+            const docs = await Promise.all(entries
+              .filter(e => e.isFile() && e.name.endsWith(".md"))
+              .map(async (e) => {
+                const relativePath = path.join(path.relative(dirPath, e.parentPath), e.name).replace(/^\.\//, "");
+                const fullPath = path.join(e.parentPath, e.name);
+                const stats = fs.statSync(fullPath);
+                return {
+                  name: e.name,
+                  path: dirName + "/" + relativePath,
+                  lastModified: stats.mtime,
+                  size: stats.size
+                };
+              })
+            );
+            allDocs.push(...docs);
+          }
           
-          const docs = await Promise.all(entries
-            .filter(e => e.isFile() && e.name.endsWith(".md"))
-            .map(async (e) => {
-              const relativePath = path.join(path.relative(docsDir, e.parentPath), e.name).replace(/^\.\//, "");
-              const fullPath = path.join(e.parentPath, e.name);
-              const stats = fs.statSync(fullPath);
-              return {
-                name: e.name,
-                path: "docs/" + relativePath,
-                lastModified: stats.mtime,
-                size: stats.size
-              };
-            })
-          );
-          
-          return Response.json({ success: true, docs });
+          return Response.json({ success: true, docs: allDocs });
         } catch (err: any) {
           return Response.json({ error: err.message }, { status: 500 });
         }
@@ -116,14 +123,15 @@ export async function startHttpServer(engine: VectorEngine) {
 
           const buffer = await file.arrayBuffer();
           let targetPath: string;
+          const targetDir = ".docs-ingested";
           
           if (file.name.endsWith(".pdf")) {
             const markdown = await pdf2md(new Uint8Array(buffer));
             const filename = file.name.replace(".pdf", ".md");
-            targetPath = path.join("docs", filename);
+            targetPath = path.join(targetDir, filename);
             await Bun.write(targetPath, markdown);
           } else if (file.name.endsWith(".md")) {
-            targetPath = path.join("docs", file.name);
+            targetPath = path.join(targetDir, file.name);
             await Bun.write(targetPath, buffer);
           } else {
             return Response.json({ error: "Unsupported file type. Please upload .md or .pdf" }, { status: 400 });
