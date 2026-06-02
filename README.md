@@ -2,7 +2,7 @@
 
 A high-performance, local semantic search engine for Markdown documentation. Built with **Bun**, **PGlite (pgvector)**, **External Postgres Support**, and **Xenova Transformers**.
 
-`raglike-md` recursively crawls your documentation, generates granular embeddings locally using the `all-MiniLM-L6-v2` model, and provides a semantic search interface via **Model Context Protocol (MCP)** or a **REST API**.
+`raglike-md` recursively crawls your documentation, generates granular embeddings locally using the `all-mpnet-base-v2` model, and provides a semantic search interface via **Model Context Protocol (MCP)** or a **REST API**.
 
 ---
 

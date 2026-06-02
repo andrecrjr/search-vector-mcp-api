@@ -43,6 +43,24 @@ export class VectorEngine {
     }
     
     await this.exec("CREATE EXTENSION IF NOT EXISTS vector;");
+
+    // Check if the table exists and if the embedding dimension matches
+    const tableExists = await this.query<{ exists: boolean }>(
+      "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'markdown_chunks')",
+      []
+    );
+
+    if (tableExists.rows[0].exists) {
+      const dimRes = await this.query<{ atttypmod: number }>(
+        "SELECT atttypmod FROM pg_attribute WHERE attrelid = 'markdown_chunks'::regclass AND attname = 'embedding'",
+        []
+      );
+      if (dimRes.rows.length > 0 && dimRes.rows[0].atttypmod !== 768) {
+        logger.warn({ oldDim: dimRes.rows[0].atttypmod, newDim: 768 }, "Vector dimension mismatch detected. Dropping table for re-ingestion.");
+        await this.exec("DROP TABLE markdown_chunks;");
+      }
+    }
+
     await this.exec(`
       CREATE TABLE IF NOT EXISTS markdown_chunks (
         id BIGSERIAL PRIMARY KEY,
@@ -364,18 +382,20 @@ export class VectorEngine {
 
     if (rerank && this.rerankerModel && this.rerankerTokenizer) {
       logger.info({ count: results.length }, "Reranking search results via cross-encoder...");
-      const reranked = await Promise.all(results.map(async (item) => {
-        const passage = `${item.heading}\n${item.content}`;
-        const inputs = await this.rerankerTokenizer(queryText, { 
-          text_pair: passage, 
-          padding: true, 
-          truncation: true 
-        });
-        const { logits } = await this.rerankerModel(inputs);
-        return {
-          ...item,
-          rerank_score: logits.data[0] // Raw logit for single-label classification
-        };
+      const passages = results.map(item => `${item.heading}\n${item.content}`);
+      const queries = new Array(passages.length).fill(queryText);
+      
+      const inputs = await this.rerankerTokenizer(queries, {
+        text_pair: passages,
+        padding: true,
+        truncation: true
+      });
+      
+      const { logits } = await this.rerankerModel(inputs);
+      
+      const reranked = results.map((item, i) => ({
+        ...item,
+        rerank_score: logits.data[i]
       }));
 
       results = reranked

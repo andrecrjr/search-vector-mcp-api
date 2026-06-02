@@ -8,7 +8,7 @@ This project is a semantic document retrieval system that indexes markdown files
 The heart of the system. It handles:
 - **Dual Database Support**: Automatically switches between local **PGlite** (with disk persistence in `./.db`) and external **Postgres** (via `POSTGRES_URL`).
 - **Smart Chunking**: Splits documents by headers and then into overlapping chunks (~600 chars) to preserve context. Each chunk is indexed with its hierarchical context (H1 > Heading).
-- **Embedding Generation**: Uses `@xenova/transformers` with the `all-MiniLM-L6-v2` model to generate 384-dimensional vectors locally.
+- **Embedding Generation**: Uses `@xenova/transformers` with the `all-mpnet-base-v2` model to generate 768-dimensional vectors locally.
 - **Hybrid Search**: Combines semantic similarity (pgvector) with keyword ranking (tsvector) for precise results.
 
 ### 2. MCP Server (`src/mcp.ts`)

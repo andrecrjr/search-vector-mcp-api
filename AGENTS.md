@@ -6,7 +6,7 @@ High-performance local semantic search engine using Bun, PGlite, and Xenova Tran
 - **Runtime:** [Bun](https://bun.sh) (Default underlying runtime)
 - **Containerization:** [Docker](https://www.docker.com/) & [Docker Compose](https://docs.docker.com/compose/) (Primary development/deployment focus)
 - **Database:** [PGlite](https://pglite.dev/) (local WASM Postgres) or external Postgres with `pgvector`.
-- **Embeddings:** `all-MiniLM-L6-v2` (384-dimensional) via `@xenova/transformers`.
+- **Embeddings:** `all-mpnet-base-v2` (768-dimensional) via `@xenova/transformers`.
 - **API:** REST API and [Model Context Protocol (MCP)](https://modelcontextprotocol.io).
 - **Logging:** [Pino](https://github.com/pinojs/pino).
 
