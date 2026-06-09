@@ -1,20 +1,21 @@
 {
-  "name": "raglike-md",
-  "version": "1.0.0",
-  "type": "module",
-  "scripts": {
-    "test": "bun test",
-    "start": "bun run src/index.ts"
-  },
-  "dependencies": {
-    "@electric-sql/pglite": "^0.4.6",
-    "@modelcontextprotocol/sdk": "^1.29.0",
-    "@huggingface/transformers": "^4.2.0",
-    "pdf2md-ts": "^1.1.1",
-    "pino": "^10.3.1",
-    "postgres": "^3.4.9"
-  },
-  "devDependencies": {
-    "@types/bun": "latest"
-  }
+	"name": "raglike-md",
+	"version": "1.0.0",
+	"type": "module",
+	"scripts": {
+		"test": "bun test",
+		"start": "bun run src/index.ts"
+	},
+	"dependencies": {
+		"@electric-sql/pglite": "^0.4.6",
+		"@modelcontextprotocol/sdk": "^1.29.0",
+		"@huggingface/transformers": "^4.2.0",
+		"pdf2md-ts": "^1.1.1",
+		"pino": "^10.3.1",
+		"postgres": "^3.4.9"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.4.16",
+		"@types/bun": "latest"
+	}
 }

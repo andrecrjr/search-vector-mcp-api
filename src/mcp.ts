@@ -1,115 +1,163 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import { VectorEngine } from "./engine";
+import {
+	CallToolRequestSchema,
+	ListToolsRequestSchema,
+} from "@modelcontextprotocol/sdk/types.js";
+import type { VectorEngine } from "./engine";
 import { logger } from "./logger";
 
 export function createMcpServer(engine: VectorEngine) {
-  const server = new Server(
-    { name: "raglike-md", version: "1.0.0" },
-    { capabilities: { tools: {} } }
-  );
+	const server = new Server(
+		{ name: "raglike-md", version: "1.0.0" },
+		{ capabilities: { tools: {} } },
+	);
 
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: [
-      {
-        name: "semantic_markdown_search",
-        description: "Searches through nested workspace markdown files using local pgvector embeddings and hybrid RRF search. Optionally reranks results using a cross-encoder for higher accuracy.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            query: { type: "string", description: "The conceptual query text string." },
-            limit: { type: "number", default: 3, description: "Number of results to return." },
-            rerank: { type: "boolean", default: false, description: "Whether to perform a secondary reranking pass using a cross-encoder (higher accuracy, more latency)." }
-          },
-          required: ["query"]
-        }
-      },
-      {
-        name: "read_chunk_neighbors",
-        description: "Fetches the text immediately preceding and following a specific chunk. Use this to get more context around a search result.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            chunk_id: { type: "number", description: "The numeric ID of the chunk (obtained from search results)." }
-          },
-          required: ["chunk_id"]
-        }
-      },
-      {
-        name: "get_full_document",
-        description: "Retrieves the full raw markdown content of a file. Use this after finding a relevant file via semantic search.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            file_path: { type: "string", description: "The relative path to the markdown file (e.g., 'docs/architecture/overview.md')." }
-          },
-          required: ["file_path"]
-        }
-      }
-    ]
-  }));
+	server.setRequestHandler(ListToolsRequestSchema, async () => ({
+		tools: [
+			{
+				name: "semantic_markdown_search",
+				description:
+					"Searches through nested workspace markdown files using local pgvector embeddings and hybrid RRF search. Optionally reranks results using a cross-encoder for higher accuracy.",
+				inputSchema: {
+					type: "object",
+					properties: {
+						query: {
+							type: "string",
+							description: "The conceptual query text string.",
+						},
+						limit: {
+							type: "number",
+							default: 3,
+							description: "Number of results to return.",
+						},
+						rerank: {
+							type: "boolean",
+							default: false,
+							description:
+								"Whether to perform a secondary reranking pass using a cross-encoder (higher accuracy, more latency).",
+						},
+					},
+					required: ["query"],
+				},
+			},
+			{
+				name: "read_chunk_neighbors",
+				description:
+					"Fetches the text immediately preceding and following a specific chunk. Use this to get more context around a search result.",
+				inputSchema: {
+					type: "object",
+					properties: {
+						chunk_id: {
+							type: "number",
+							description:
+								"The numeric ID of the chunk (obtained from search results).",
+						},
+					},
+					required: ["chunk_id"],
+				},
+			},
+			{
+				name: "get_full_document",
+				description:
+					"Retrieves the full raw markdown content of a file. Use this after finding a relevant file via semantic search.",
+				inputSchema: {
+					type: "object",
+					properties: {
+						file_path: {
+							type: "string",
+							description:
+								"The relative path to the markdown file (e.g., 'docs/architecture/overview.md').",
+						},
+					},
+					required: ["file_path"],
+				},
+			},
+		],
+	}));
 
-  server.setRequestHandler(CallToolRequestSchema, async (req) => {
-    if (req.params.name === "semantic_markdown_search") {
-      const query = String(req.params.arguments?.query || "");
-      const limit = Number(req.params.arguments?.limit || 3);
-      const rerank = Boolean(req.params.arguments?.rerank || false);
+	server.setRequestHandler(CallToolRequestSchema, async (req) => {
+		if (req.params.name === "semantic_markdown_search") {
+			const query = String(req.params.arguments?.query || "");
+			const limit = Number(req.params.arguments?.limit || 3);
+			const rerank = Boolean(req.params.arguments?.rerank || false);
 
-      const matches = await engine.search(query, limit, rerank);
-      const output = matches.map(m => {
-        const scoreLabel = rerank ? "Rerank Score" : "Distance";
-        const scoreValue = rerank ? (m as any).rerank_score.toFixed(4) : m.distance.toFixed(4);
-        return `### ID: [${m.id}] File: \`${m.file_path}\` > \`${m.heading}\` (${scoreLabel}: ${scoreValue})\n---\n${m.content}\n---\n`;
-      }).join("\n");
+			const matches = await engine.search(query, limit, rerank);
+			const output = matches
+				.map((m) => {
+					const scoreLabel = rerank ? "Rerank Score" : "Distance";
+					const scoreValue = rerank
+						? (m.rerank_score ?? 0).toFixed(4)
+						: m.distance.toFixed(4);
+					return `### ID: [${m.id}] File: \`${m.file_path}\` > \`${m.heading}\` (${scoreLabel}: ${scoreValue})\n---\n${m.content}\n---\n`;
+				})
+				.join("\n");
 
-      return { content: [{ type: "text", text: output }] };
-    }
+			return { content: [{ type: "text", text: output }] };
+		}
 
-    if (req.params.name === "read_chunk_neighbors") {
-      const chunkId = Number(req.params.arguments?.chunk_id);
-      const neighbors = await engine.getChunkNeighbors(chunkId);
-      
-      if (!neighbors) {
-        return { content: [{ type: "text", text: `Error: Chunk with ID ${chunkId} not found.` }], isError: true };
-      }
+		if (req.params.name === "read_chunk_neighbors") {
+			const chunkId = Number(req.params.arguments?.chunk_id);
+			const neighbors = await engine.getChunkNeighbors(chunkId);
 
-      let text = `Neighbors for Chunk [${chunkId}]:\n\n`;
-      if (neighbors.previous) {
-        text += `PREVIOUS CHUNK [${neighbors.previous.id}] (${neighbors.previous.heading}):\n---\n${neighbors.previous.content}\n---\n\n`;
-      } else {
-        text += `PREVIOUS CHUNK: (None - Beginning of file)\n\n`;
-      }
+			if (!neighbors) {
+				return {
+					content: [
+						{
+							type: "text",
+							text: `Error: Chunk with ID ${chunkId} not found.`,
+						},
+					],
+					isError: true,
+				};
+			}
 
-      if (neighbors.next) {
-        text += `NEXT CHUNK [${neighbors.next.id}] (${neighbors.next.heading}):\n---\n${neighbors.next.content}\n---\n`;
-      } else {
-        text += `NEXT CHUNK: (None - End of file)\n`;
-      }
+			let text = `Neighbors for Chunk [${chunkId}]:\n\n`;
+			if (neighbors.previous) {
+				text += `PREVIOUS CHUNK [${neighbors.previous.id}] (${neighbors.previous.heading}):\n---\n${neighbors.previous.content}\n---\n\n`;
+			} else {
+				text += `PREVIOUS CHUNK: (None - Beginning of file)\n\n`;
+			}
 
-      return { content: [{ type: "text", text }] };
-    }
+			if (neighbors.next) {
+				text += `NEXT CHUNK [${neighbors.next.id}] (${neighbors.next.heading}):\n---\n${neighbors.next.content}\n---\n`;
+			} else {
+				text += `NEXT CHUNK: (None - End of file)\n`;
+			}
 
-    if (req.params.name === "get_full_document") {
-      const filePath = String(req.params.arguments?.file_path || "");
-      try {
-        const content = await engine.readDocument(filePath);
-        if (!content) return { content: [{ type: "text", text: `Error: File '${filePath}' not found.` }], isError: true };
-        return { content: [{ type: "text", text: content }] };
-      } catch (err: any) {
-        return { content: [{ type: "text", text: `Error: ${err.message}` }], isError: true };
-      }
-    }
+			return { content: [{ type: "text", text }] };
+		}
 
-    throw new Error("Tool unexpected.");
-  });
+		if (req.params.name === "get_full_document") {
+			const filePath = String(req.params.arguments?.file_path || "");
+			try {
+				const content = await engine.readDocument(filePath);
+				if (!content)
+					return {
+						content: [
+							{ type: "text", text: `Error: File '${filePath}' not found.` },
+						],
+						isError: true,
+					};
+				return { content: [{ type: "text", text: content }] };
+			} catch (err) {
+				const message = err instanceof Error ? err.message : String(err);
+				return {
+					content: [{ type: "text", text: `Error: ${message}` }],
+					isError: true,
+				};
+			}
+		}
 
-  return server;
+		throw new Error("Tool unexpected.");
+	});
+
+	return server;
 }
 
 export async function startMcpServer(engine: VectorEngine) {
-  const server = createMcpServer(engine);
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  logger.info("MCP Layer linked cleanly via standard IO streams.");
+	const server = createMcpServer(engine);
+	const transport = new StdioServerTransport();
+	await server.connect(transport);
+	logger.info("MCP Layer linked cleanly via standard IO streams.");
 }
