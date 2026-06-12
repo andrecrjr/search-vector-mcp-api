@@ -25,6 +25,15 @@ if (!(await engine.hasData())) {
 	// Index both standard docs and the ingested folder
 	await engine.indexDirectory(docsDirectoryPath);
 	await engine.indexDirectory(ingestedDirectoryPath);
+
+	// Also index key root files
+	const rootFiles = ["README.md", "todo.md"];
+	for (const file of rootFiles) {
+		const filePath = path.join(process.cwd(), file);
+		if (fs.existsSync(filePath)) {
+			await engine.indexSingleFile(filePath);
+		}
+	}
 } else {
 	logger.info(
 		"Persistent database already contains data. Skipping auto-ingestion.",

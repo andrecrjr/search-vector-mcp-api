@@ -7,6 +7,11 @@ import {
 	AutoTokenizer,
 	pipeline,
 } from "@huggingface/transformers";
+import type { Content, Root } from "mdast";
+import { fromMarkdown } from "mdast-util-from-markdown";
+import { toMarkdown } from "mdast-util-to-markdown";
+import { toString as mdastToString } from "mdast-util-to-string";
+import pdf2md from "pdf2md-ts";
 import postgres from "postgres";
 import { logger } from "./logger";
 
@@ -38,6 +43,7 @@ export interface MarkdownChunk {
 	rerank_score?: number;
 	last_modified?: Date;
 	word_count?: number;
+	repository_id?: string;
 }
 
 export class VectorEngine {
@@ -123,6 +129,7 @@ export class VectorEngine {
         embedding vector(768),
         last_modified TIMESTAMP,
         word_count INTEGER,
+        repository_id TEXT,
         search_vector tsvector GENERATED ALWAYS AS (
           setweight(to_tsvector('english', coalesce(heading, '')), 'A') || 
           setweight(to_tsvector('english', coalesce(content, '')), 'B')
@@ -144,6 +151,9 @@ export class VectorEngine {
 			);
 			await this.exec(
 				"ALTER TABLE markdown_chunks ADD COLUMN IF NOT EXISTS word_count INTEGER;",
+			);
+			await this.exec(
+				"ALTER TABLE markdown_chunks ADD COLUMN IF NOT EXISTS repository_id TEXT;",
 			);
 
 			// Check if we need to upgrade search_vector to weighted version
@@ -242,7 +252,7 @@ export class VectorEngine {
 			const res = path.resolve(dir, entry.name);
 			return entry.isDirectory() ? this.getFilesRecursively(res) : res;
 		});
-		return files.flat().filter((f) => f.endsWith(".md"));
+		return files.flat().filter((f) => f.endsWith(".md") || f.endsWith(".pdf"));
 	}
 
 	async indexDirectory(rootDocsDir: string) {
@@ -261,14 +271,21 @@ export class VectorEngine {
 		);
 	}
 
-	public async indexSingleFile(filePath: string) {
+	public async indexSingleFile(filePath: string, repositoryId?: string) {
 		const relativePath = path.relative(process.cwd(), filePath);
 		const stats = fs.statSync(filePath);
 		const lastModified = stats.mtime;
-		let rawContent = fs.readFileSync(filePath, "utf-8");
+		let rawContent: string;
+
+		if (filePath.endsWith(".pdf")) {
+			const buffer = fs.readFileSync(filePath);
+			const pages = await pdf2md(new Uint8Array(buffer));
+			rawContent = pages.join("\n\n");
+		} else {
+			rawContent = fs.readFileSync(filePath, "utf-8");
+		}
 
 		// Clean base64 image data from markdown to prevent bloating the vector database
-		// This handles both standard markdown ![alt](data:...) and <img> tags
 		rawContent = rawContent.replace(
 			/!\[.*?\]\(data:image\/[^;]+;base64,[^)]*\)/g,
 			"",
@@ -277,177 +294,219 @@ export class VectorEngine {
 			/<img\s+[^>]*src="data:image\/[^;]+;base64,[^"]*"[^>]*>/g,
 			"",
 		);
-		// Fallback for any orphaned base64 data URI strings
 		rawContent = rawContent.replace(
 			/data:image\/[^;]+;base64,[a-zA-Z0-9+/=]+/g,
 			"",
 		);
 
-		// Strip raw HTML tags to prevent them from polluting embeddings and full-text search
-		rawContent = rawContent.replace(/<[^>]*>?/g, "");
-		// Clean markdown links: [text](url) -> text
-		// This reduces noise from long URLs that don't have semantic meaning for search
-		rawContent = rawContent.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
-
 		// Clear old chunks first to ensure clean updates
 		await this.removeDocument(relativePath);
 
-		const lines = rawContent.split("\n");
+		const tree = fromMarkdown(rawContent);
+		const chunksToInsert: [
+			string,
+			string,
+			string,
+			string,
+			Date,
+			number,
+			string | null,
+		][] = [];
 		const breadcrumbs: string[] = [];
-		const sections: { breadcrumb: string; content: string }[] = [];
-		let currentSectionContent: string[] = [];
+		const chunksRaw: { heading: string; content: string }[] = [];
 
-		for (const line of lines) {
-			const headerMatch = line.match(/^(#+) (.*)$/);
-			if (headerMatch?.[1] && headerMatch[2]) {
-				// Save previous section if it has content
-				if (currentSectionContent.length > 0) {
-					sections.push({
-						breadcrumb: breadcrumbs.join(" > "),
-						content: currentSectionContent.join("\n").trim(),
-					});
-					currentSectionContent = [];
+		let currentChunkNodes: Content[] = [];
+		let currentChunkTextLength = 0;
+		const CHUNK_SIZE_LIMIT = 1200; // Increased limit for AST-based chunks to keep structural integrity
+
+		const emitChunk = (nodes: Content[], breadcrumbs: string[]) => {
+			if (nodes.length === 0) return;
+
+			// Convert nodes back to markdown
+			const content = toMarkdown({
+				type: "root",
+				children: nodes,
+			} as Root).trim();
+			if (!content) return;
+
+			const heading = breadcrumbs.join(" > ") || "General";
+			chunksRaw.push({ heading, content });
+		};
+
+		for (let i = 0; i < tree.children.length; i++) {
+			const node = tree.children[i];
+
+			if (node.type === "heading") {
+				// Header is a natural boundary
+				if (currentChunkNodes.length > 0) {
+					emitChunk(currentChunkNodes, breadcrumbs);
+					currentChunkNodes = [];
+					currentChunkTextLength = 0;
 				}
 
-				const level = headerMatch[1].length;
-				const title = headerMatch[2].trim();
+				const level = node.depth;
+				const title = mdastToString(node).trim();
 
 				// Update breadcrumbs based on level
 				while (breadcrumbs.length >= level) {
 					breadcrumbs.pop();
 				}
 				breadcrumbs.push(title);
-			} else {
-				currentSectionContent.push(line);
+
+				// Optional: should the header itself be part of the next chunk?
+				// For structural search, yes, it helps context.
+				currentChunkNodes.push(node);
+				currentChunkTextLength += title.length;
+				continue;
+			}
+
+			const nodeText = mdastToString(node);
+
+			// Code Block Bundling Logic
+			if (node.type === "code") {
+				// If adding this code block would make the chunk too large,
+				// and we already have a preceding paragraph, we might still want to keep them together
+				// unless it's truly massive.
+				if (
+					currentChunkTextLength > 0 &&
+					currentChunkTextLength + nodeText.length > CHUNK_SIZE_LIMIT
+				) {
+					// Only emit if the current chunk isn't just a short contextual paragraph
+					// If the last node was a paragraph and it's short, keep it for context.
+					const lastNode = currentChunkNodes[currentChunkNodes.length - 1];
+					if (
+						lastNode &&
+						lastNode.type === "paragraph" &&
+						mdastToString(lastNode).length < 200
+					) {
+						// Keep it together, don't emit yet.
+					} else {
+						emitChunk(currentChunkNodes, breadcrumbs);
+						currentChunkNodes = [];
+						currentChunkTextLength = 0;
+					}
+				}
+			}
+
+			currentChunkNodes.push(node);
+			currentChunkTextLength += nodeText.length;
+
+			// If we reached the limit, emit and start new
+			if (currentChunkTextLength >= CHUNK_SIZE_LIMIT) {
+				// Check if the next node is a code block. If so, don't emit yet,
+				// so we can bundle them in the next iteration's code logic.
+				const nextNode = tree.children[i + 1];
+				if (nextNode && nextNode.type === "code") {
+					// Delay emission to bundle with code block
+				} else {
+					emitChunk(currentChunkNodes, breadcrumbs);
+					currentChunkNodes = [];
+					currentChunkTextLength = 0;
+				}
 			}
 		}
 
-		// Add last section
-		if (currentSectionContent.length > 0) {
-			sections.push({
-				breadcrumb: breadcrumbs.join(" > ") || "General",
-				content: currentSectionContent.join("\n").trim(),
-			});
+		// Final chunk
+		if (currentChunkNodes.length > 0) {
+			emitChunk(currentChunkNodes, breadcrumbs);
 		}
 
-		const chunksToInsert: [string, string, string, string, Date, number][] = [];
-
-		// Use native Intl.Segmenter for high-quality sentence boundary detection
 		const segmenter = new Intl.Segmenter("en", { granularity: "sentence" });
 		const getSentences = (text: string) => {
 			return Array.from(segmenter.segment(text)).map((s) => s.segment);
 		};
 
-		for (let i = 0; i < sections.length; i++) {
-			const section = sections[i];
-			if (!section?.content) continue;
-			const { breadcrumb, content } = section;
+		// Apply Context Slop and generate embeddings
+		for (let i = 0; i < chunksRaw.length; i++) {
+			const chunk = chunksRaw[i];
+			let finalContent = chunk.content;
 
-			const CHUNK_SIZE = 600;
-			const CHUNK_OVERLAP_CHARS = 120;
-
-			const sentences = getSentences(content);
-			const sectionChunks: string[] = [];
-			let currentChunkSentences: string[] = [];
-			let currentChunkLength = 0;
-
-			for (let sIdx = 0; sIdx < sentences.length; sIdx++) {
-				const sentence = sentences[sIdx];
-				if (!sentence) continue;
-				currentChunkSentences.push(sentence);
-				currentChunkLength += sentence.length;
-
-				if (currentChunkLength >= CHUNK_SIZE || sIdx === sentences.length - 1) {
-					sectionChunks.push(currentChunkSentences.join("").trim());
-
-					// To implement overlap semantically, we backtrack a few sentences
-					// until we reach approximately CHUNK_OVERLAP_CHARS
-					const lastSentences: string[] = [];
-					let overlapLength = 0;
-					for (let k = currentChunkSentences.length - 1; k >= 0; k--) {
-						const sent = currentChunkSentences[k];
-						if (!sent) continue;
-						if (
-							overlapLength + sent.length > CHUNK_OVERLAP_CHARS &&
-							lastSentences.length > 0
-						)
-							break;
-						lastSentences.unshift(sent);
-						overlapLength += sent.length;
-					}
-
-					currentChunkSentences = lastSentences;
-					currentChunkLength = overlapLength;
+			// Prepend slop from previous chunk
+			if (i > 0) {
+				const prev = chunksRaw[i - 1];
+				const prevSents = getSentences(prev.content);
+				const lastSent = prevSents[prevSents.length - 1];
+				if (lastSent) {
+					finalContent = `[Context from ${prev.heading}]: ...${lastSent.trim()}\n\n${finalContent}`;
 				}
 			}
 
-			// Apply Context Slop within section and between sections
-			for (let j = 0; j < sectionChunks.length; j++) {
-				let finalChunkContent = sectionChunks[j];
-				if (!finalChunkContent) continue;
-
-				// Prepend slop from previous section if first chunk
-				if (j === 0 && i > 0) {
-					const prevSection = sections[i - 1];
-					if (prevSection) {
-						const prevSentences = getSentences(prevSection.content);
-						const lastSentence = prevSentences[prevSentences.length - 1];
-						if (lastSentence) {
-							finalChunkContent = `[Context from ${prevSection.breadcrumb}]: ...${lastSentence}\n\n${finalChunkContent}`;
-						}
-					}
+			// Append slop from next chunk
+			if (i < chunksRaw.length - 1) {
+				const next = chunksRaw[i + 1];
+				const nextSents = getSentences(next.content);
+				const firstSent = nextSents[0];
+				if (firstSent) {
+					finalContent = `${finalContent}\n\n[Context continues in ${next.heading}]: ${firstSent.trim()}...`;
 				}
-
-				// Append slop from next section if last chunk
-				if (j === sectionChunks.length - 1 && i < sections.length - 1) {
-					const nextSection = sections[i + 1];
-					if (nextSection) {
-						const nextSentences = getSentences(nextSection.content);
-						const firstSentence = nextSentences[0];
-						if (firstSentence) {
-							finalChunkContent = `${finalChunkContent}\n\n[Context continues in ${nextSection.breadcrumb}]: ${firstSentence}...`;
-						}
-					}
-				}
-
-				const wordCount = finalChunkContent.split(/\s+/).length;
-				const vectorString = await this.generateEmbeddingString(
-					`${breadcrumb}\n${finalChunkContent}`,
-				);
-				chunksToInsert.push([
-					relativePath,
-					breadcrumb,
-					finalChunkContent,
-					vectorString,
-					lastModified,
-					wordCount,
-				]);
 			}
+
+			const wordCount = finalContent.split(/\s+/).length;
+			const embeddingContent = `${chunk.heading}\n${finalContent}`;
+			const vectorString = await this.generateEmbeddingString(embeddingContent);
+
+			chunksToInsert.push([
+				relativePath,
+				chunk.heading,
+				finalContent,
+				vectorString,
+				lastModified,
+				wordCount,
+				repositoryId || null,
+			]);
 		}
+
+		logger.debug(
+			{ file: relativePath, chunkCount: chunksToInsert.length },
+			"Attempting to insert chunks into database",
+		);
 
 		// Batch insert for this file
 		if (chunksToInsert.length > 0) {
-			if (this.sql) {
-				await this.sql`
-          INSERT INTO markdown_chunks (file_path, heading, content, embedding, last_modified, word_count)
+			try {
+				if (this.sql) {
+					await this.sql`
+          INSERT INTO markdown_chunks (file_path, heading, content, embedding, last_modified, word_count, repository_id)
           VALUES ${this.sql(chunksToInsert as unknown as postgres.Parameter[][])}
         `;
-			} else {
-				for (const [path, head, cont, emb, mod, word] of chunksToInsert) {
-					await this.query(
-						"INSERT INTO markdown_chunks (file_path, heading, content, embedding, last_modified, word_count) VALUES ($1, $2, $3, $4, $5, $6)",
-						[path, head, cont, emb, mod, word],
-					);
+				} else {
+					for (const [
+						path,
+						head,
+						cont,
+						emb,
+						mod,
+						word,
+						repo,
+					] of chunksToInsert) {
+						await this.query(
+							"INSERT INTO markdown_chunks (file_path, heading, content, embedding, last_modified, word_count, repository_id) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+							[path, head, cont, emb, mod, word, repo],
+						);
+					}
 				}
+				logger.info(
+					{ file: relativePath, chunks: chunksToInsert.length },
+					"File indexed successfully.",
+				);
+			} catch (err) {
+				logger.error(
+					{ err, file: relativePath },
+					"Failed to insert chunks into database",
+				);
+				throw err;
 			}
+		} else {
+			logger.warn({ file: relativePath }, "No chunks generated for file");
 		}
-		logger.info(
-			{ file: relativePath, chunks: chunksToInsert.length },
-			"File indexed with hierarchical context and slop.",
-		);
 	}
 
-	async search(queryText: string, limit: number, rerank: boolean = false) {
+	async search(
+		queryText: string,
+		limit: number,
+		rerank: boolean = false,
+		repositoryId?: string,
+	) {
 		const queryVectorStr = await this.generateEmbeddingString(queryText);
 
 		// Hybrid Search: Reciprocal Rank Fusion (RRF)
@@ -461,6 +520,8 @@ export class VectorEngine {
 		// If reranking, we fetch more results initially to have a better candidate pool
 		const initialLimit = rerank ? Math.max(limit * 5, 50) : limit;
 
+		const repoFilter = repositoryId ? "AND repository_id = $4" : "";
+
 		const res = await this.query<{
 			id: string;
 			file_path: string;
@@ -468,17 +529,19 @@ export class VectorEngine {
 			content: string;
 			distance: number;
 			rrf_score: number;
+			repository_id: string;
 		}>(
 			`
       WITH vector_search AS (
         SELECT id, row_number() OVER (ORDER BY embedding <=> $1 ASC) as rank
         FROM markdown_chunks
+        WHERE 1=1 ${repoFilter}
         LIMIT $3 * 2
       ),
       text_search AS (
         SELECT id, row_number() OVER (ORDER BY ts_rank_cd(search_vector, websearch_to_tsquery('english', $2)) DESC) as rank
         FROM markdown_chunks
-        WHERE search_vector @@ websearch_to_tsquery('english', $2)
+        WHERE search_vector @@ websearch_to_tsquery('english', $2) ${repoFilter}
         LIMIT $3 * 2
       )
       SELECT 
@@ -488,6 +551,7 @@ export class VectorEngine {
         m.content, 
         m.last_modified,
         m.word_count,
+        m.repository_id,
         COALESCE((m.embedding <=> $1), 1.0) as distance,
         (
           COALESCE(${VECTOR_WEIGHT.toFixed(1)} / (${K}.0 + v.rank), 0.0) + 
@@ -500,7 +564,9 @@ export class VectorEngine {
       ORDER BY rrf_score DESC
       LIMIT $3;
     `,
-			[queryVectorStr, queryText, initialLimit],
+			repositoryId
+				? [queryVectorStr, queryText, initialLimit, repositoryId]
+				: [queryVectorStr, queryText, initialLimit],
 		);
 
 		let results: MarkdownChunk[] = res.rows;
@@ -576,6 +642,11 @@ export class VectorEngine {
 		}
 
 		if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
+			if (fullPath.endsWith(".pdf")) {
+				const buffer = fs.readFileSync(fullPath);
+				const pages = await pdf2md(new Uint8Array(buffer));
+				return pages.join("\n\n");
+			}
 			return fs.readFileSync(fullPath, "utf-8");
 		}
 		return null;

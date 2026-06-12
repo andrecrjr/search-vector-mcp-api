@@ -2,6 +2,10 @@
 
 High-performance local semantic search engine using Bun, PGlite, and Xenova Transformers. This file serves as the primary technical guide for both human developers and AI agents.
 
+- You must use only docker.
+- You must use biome lint to check if code is correct always for each file you use.
+- You are a senior perfect typescript developer, avoid `any` at all costs.
+
 ## Tech Stack
 - **Runtime:** [Bun](https://bun.sh) (Default underlying runtime)
 - **Containerization:** [Docker](https://www.docker.com/) & [Docker Compose](https://docs.docker.com/compose/) (Primary development/deployment focus)

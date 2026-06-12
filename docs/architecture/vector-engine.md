@@ -39,7 +39,30 @@ Search is performed using a multi-signal ranking system:
 2. **Full-Text Search**: Uses Postgres `tsvector` and `ts_rank_cd` with a GIN index to find exact keyword matches (e.g., function names, error codes).
 3. **Reciprocal Rank Fusion (RRF)**: Results from both vector and keyword searches are combined using the RRF algorithm. This provides a more robust and precise ranking by rewarding documents that appear in both result sets, ensuring that technical specificity and semantic meaning are perfectly balanced.
 
-## Stage 2: Cross-Encoder Reranking
+## Repo Scoping & Multi-Tenancy
+The engine supports logical isolation and targeted retrieval through **Repo Scoping**. This is particularly useful for users managing multiple projects or organizations.
+
+### How it Works
+1. **Tagging**: When a document is indexed (either via the `/upload` endpoint or the `GitManager`), it can be associated with a `repository_id`.
+   - **Git Webhooks**: Automatically tag chunks with the repository's full name (e.g., `facebook-react`).
+   - **Direct Uploads**: Chunks are currently untagged (global scope) unless manually specified in the engine call.
+2. **Indexing**: The `repository_id` is stored as a first-class column in the `markdown_chunks` table.
+3. **Targeted Retrieval**: Both the REST API (`/search`) and MCP tools (`semantic_markdown_search`) accept a `repository` parameter.
+4. **Isolation**: When a scope is provided, the engine applies a hard filter (`WHERE repository_id = $ID`) at the database level for both vector and keyword search paths. This ensures that results are strictly contained within the requested project, reducing noise and increasing relevance.
+
+### Usage in Tools
+AI agents can use this to focus their research:
+```json
+{
+  "name": "semantic_markdown_search",
+  "arguments": {
+    "query": "how to configure auth",
+    "repository": "my-org-project-x"
+  }
+}
+```
+
+### Stage 2: Cross-Encoder Reranking
 For high-precision requirements, the engine supports an optional second stage of retrieval using a **Cross-Encoder** (`Xenova/bge-reranker-base`).
 
 ### How it Works

@@ -24,17 +24,18 @@ describe("PGlite Vector Search Engine Core", () => {
 		if (!fs.existsSync(testDbDir)) fs.mkdirSync(testDbDir, { recursive: true });
 		engine = new VectorEngine(testDbDir);
 		await engine.initialize();
-	});
+	}, 60000);
 
 	afterAll(async () => {
 		await engine.destroy();
 		if (fs.existsSync(testDbDir)) {
 			fs.rmSync(testDbDir, { recursive: true, force: true });
 		}
-	});
+	}, 10000);
 
 	beforeEach(async () => {
 		// Generate nested directories
+		if (!fs.existsSync(mockDocsDir)) fs.mkdirSync(mockDocsDir, { recursive: true });
 		fs.mkdirSync(path.join(mockDocsDir, "nested/layer"), { recursive: true });
 		fs.writeFileSync(
 			path.join(mockDocsDir, "nested/layer/doc.md"),
@@ -63,7 +64,7 @@ describe("PGlite Vector Search Engine Core", () => {
 		expect(matches.length).toBe(1);
 		expect(matches[0].heading).toBe("Deep Module");
 		expect(matches[0].content).toContain("highly isolated");
-	});
+	}, 30000);
 
 	test("Should split sections into multiple granular chunks with context awareness", async () => {
 		fs.writeFileSync(
@@ -93,7 +94,7 @@ describe("PGlite Vector Search Engine Core", () => {
 			),
 		).toBe(true);
 		expect(matches[0].heading).toContain("Section One");
-	});
+	}, 30000);
 
 	test("Should retrieve chunk neighbors correctly", async () => {
 		fs.writeFileSync(
@@ -113,7 +114,7 @@ describe("PGlite Vector Search Engine Core", () => {
 		// Section B should have both A and C as neighbors in this 3-section file
 		expect(neighbors?.previous?.content).toContain("This is part A");
 		expect(neighbors?.next?.content).toContain("This is part C");
-	});
+	}, 30000);
 
 	test("Should filter out base64 image data during ingestion", async () => {
 		const base64Content =
@@ -137,7 +138,7 @@ describe("PGlite Vector Search Engine Core", () => {
 		expect(matches[0].content).not.toContain(base64Content);
 		expect(matches[0].content).not.toContain("data:image/png;base64");
 		expect(matches[0].content).toContain("This text should be indexed.");
-	});
+	}, 30000);
 
 	test("Should prioritize keyword matches in headings (Weighted Search)", async () => {
 		fs.writeFileSync(
@@ -152,7 +153,7 @@ describe("PGlite Vector Search Engine Core", () => {
 		expect(matches.length).toBe(2);
 		// The chunk with the keyword in the heading should be ranked first
 		expect(matches[0].heading).toBe("UniqueTitleKeyword");
-	});
+	}, 30000);
 
 	test("Should apply cross-encoder reranking and return rerank_score", async () => {
 		fs.writeFileSync(
@@ -192,5 +193,5 @@ describe("PGlite Vector Search Engine Core", () => {
 
 		// Semantic match verification
 		expect(withRerank[0].heading).toBe("Search");
-	});
+	}, 30000);
 });

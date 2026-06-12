@@ -8,8 +8,12 @@
 	},
 	"dependencies": {
 		"@electric-sql/pglite": "^0.4.6",
-		"@modelcontextprotocol/sdk": "^1.29.0",
 		"@huggingface/transformers": "^4.2.0",
+		"@modelcontextprotocol/sdk": "^1.29.0",
+		"mdast": "^3.0.0",
+		"mdast-util-from-markdown": "^2.0.3",
+		"mdast-util-to-markdown": "^2.1.2",
+		"mdast-util-to-string": "^4.0.0",
 		"pdf2md-ts": "^1.1.1",
 		"pino": "^10.3.1",
 		"postgres": "^3.4.9"

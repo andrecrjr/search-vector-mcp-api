@@ -37,6 +37,10 @@ export function createMcpServer(engine: VectorEngine) {
 							description:
 								"Whether to perform a secondary reranking pass using a cross-encoder (higher accuracy, more latency).",
 						},
+						repository: {
+							type: "string",
+							description: "Optional repository ID to scope the search.",
+						},
 					},
 					required: ["query"],
 				},
@@ -81,15 +85,17 @@ export function createMcpServer(engine: VectorEngine) {
 			const query = String(req.params.arguments?.query || "");
 			const limit = Number(req.params.arguments?.limit || 3);
 			const rerank = Boolean(req.params.arguments?.rerank || false);
+			const repository = req.params.arguments?.repository ? String(req.params.arguments.repository) : undefined;
 
-			const matches = await engine.search(query, limit, rerank);
+			const matches = await engine.search(query, limit, rerank, repository);
 			const output = matches
 				.map((m) => {
 					const scoreLabel = rerank ? "Rerank Score" : "Distance";
 					const scoreValue = rerank
 						? (m.rerank_score ?? 0).toFixed(4)
 						: m.distance.toFixed(4);
-					return `### ID: [${m.id}] File: \`${m.file_path}\` > \`${m.heading}\` (${scoreLabel}: ${scoreValue})\n---\n${m.content}\n---\n`;
+					const repoInfo = m.repository_id ? ` Repo: \`${m.repository_id}\`` : "";
+					return `### ID: [${m.id}] File: \`${m.file_path}\`${repoInfo} > \`${m.heading}\` (${scoreLabel}: ${scoreValue})\n---\n${m.content}\n---\n`;
 				})
 				.join("\n");
 
